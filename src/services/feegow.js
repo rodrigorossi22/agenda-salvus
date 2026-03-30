@@ -69,6 +69,6 @@ export async function fetchProcedures() {
 export async function updateAppointmentStatus({ agendamento_id, status_id, obs }) {
   return request('/appoints/statusUpdate', {
     method: 'POST',
-    body: JSON.stringify({ AgendamentoID: agendamento_id, StatusID: status_id, ...(obs ? { Obs: obs } : {}) }),
+    body: JSON.stringify({ AgendamentoID: agendamento_id, StatusID: String(status_id), ...(obs ? { Obs: obs } : {}) }),
   })
 }
