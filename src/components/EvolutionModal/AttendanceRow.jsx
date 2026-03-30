@@ -1,5 +1,10 @@
 import React from 'react';
 
+// status IDs:
+// Compareceu = 3 (Atendido)
+// Não compareceu = 6
+// Remarcado = 15
+
 export function AttendanceRow({ value, onChange }) {
     const options = [
         { label: 'Compareceu', value: 3 },

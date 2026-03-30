@@ -1,16 +1,5 @@
 /**
  * Formata os dados preenchidos no modal de evolução para o campo texto "obs" da Feegow.
- *
- * Formato esperado:
- * [Procedimentos: Proc 1, Proc 2]
- * [Próximos passos: Retorno]
- * Evolução: Texto livre
- *
- * @param {Object} params
- * @param {string[]} params.procedures - Lista de nomes dos procedimentos
- * @param {string} params.nextSteps - Texto livre dos próximos passos
- * @param {string} params.evolution - Texto livre da evolução
- * @returns {string} String formatada
  */
 export function formatNotes({ procedures = [], nextSteps = '', evolution = '' } = {}) {
     const parts = [];
@@ -27,5 +16,6 @@ export function formatNotes({ procedures = [], nextSteps = '', evolution = '' } 
         parts.push(`Evolução: ${evolution.trim()}`);
     }
 
-    return parts.join('\n');
+    // Usa um traço vertical em vez de \n (Enter)
+    return parts.join(' | ');
 }
