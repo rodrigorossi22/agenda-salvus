@@ -6,7 +6,8 @@ import { updateAppointmentStatus } from '../../services/feegow';
 import { formatNotes } from '../../utils/formatNotes';
 
 export function EvolutionModal({ appointment, procedureMap = {}, onClose, onSuccess }) {
-    const [statusId, setStatusId] = useState(appointment?.status_id || 2);
+    const initialStatus = appointment?.status_id === 2 ? 3 : (appointment?.status_id || 3);
+    const [statusId, setStatusId] = useState(initialStatus);
     const [procedures, setProcedures] = useState([]);
     const [nextSteps, setNextSteps] = useState('');
     const [evolutionText, setEvolutionText] = useState('');
@@ -72,9 +73,7 @@ export function EvolutionModal({ appointment, procedureMap = {}, onClose, onSucc
                                 border border-white/10 shadow-2xl shadow-black/60
                                 bg-[#111]/80 backdrop-blur-xl"
                 >
-                    {/* Header — gradient top bar */}
                     <div className="relative p-6 bg-gradient-to-b from-[#1a1612] to-transparent border-b border-white/5">
-                        {/* Gold accent line */}
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#c5a059]/60 to-transparent" />
 
                         <div className="flex items-start justify-between">
@@ -110,7 +109,6 @@ export function EvolutionModal({ appointment, procedureMap = {}, onClose, onSucc
                         </div>
                     </div>
 
-                    {/* Corpo scrollável */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-7">
                         {error && (
                             <motion.div
@@ -155,7 +153,6 @@ export function EvolutionModal({ appointment, procedureMap = {}, onClose, onSucc
                         </div>
                     </div>
 
-                    {/* Footer */}
                     <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/5 bg-black/30">
                         <motion.button
                             onClick={onClose}
