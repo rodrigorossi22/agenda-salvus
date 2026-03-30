@@ -23,7 +23,7 @@ describe('fetchAppointments', () => {
     const appt = { agendamento_id: 1, horario: '09:00:00', paciente_id: 5 }
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ content: [appt] }) })
     const result = await fetchAppointments('20-03-2026')
-    expect(result).toEqual([appt])
+    expect(result).toEqual([{ ...appt, paciente_nome: "Paciente #5" }])
   })
 })
 

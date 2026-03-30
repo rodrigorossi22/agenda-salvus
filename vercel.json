@@ -1,0 +1,13 @@
+{
+    "name": "agenda-salvus",
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/api/proxy?path=$1"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}

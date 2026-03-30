@@ -1,1 +1,46 @@
 @import "tailwindcss";
+
+/* Salvus custom theme */
+@theme {
+  --color-salvus: #c5a059;
+  --color-salvus-light: #d6b16a;
+  --color-salvus-dim: rgba(197, 160, 89, 0.2);
+  --color-bg: #0a0a0a;
+  --color-panel: #111111;
+  --color-border: #333333;
+}
+
+/* Base styles */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg);
+  color: #e5e5e5;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Pulse animation for pending evolution cards */
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 6px rgba(234, 179, 8, 0.2); }
+  50% { box-shadow: 0 0 14px rgba(234, 179, 8, 0.45); }
+}
+.animate-pulse-gold {
+  animation: pulse-gold 2s ease-in-out infinite;
+}
