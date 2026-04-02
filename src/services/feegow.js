@@ -13,15 +13,15 @@ function getHeaders() {
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, { headers: getHeaders(), ...options })
   if (!res.ok) throw new Error(`Erro na conexão HTTP: ${res.status}`)
-  
+
   const data = await res.json()
-  
+
   // Deteta o erro silencioso da Feegow
   if (data && data.success === false) {
     const errorMessage = data.error || data.message || data.content?.msg || 'Rejeitado por regra de negócio da Feegow';
     throw new Error(`Feegow diz: ${errorMessage}`);
   }
-  
+
   return data
 }
 
@@ -69,12 +69,33 @@ export async function fetchProcedures() {
 }
 
 export async function updateAppointmentStatus({ agendamento_id, status_id, obs }) {
+  const payload = {
+    AgendamentoID: String(agendamento_id),
+    StatusID: String(status_id),
+    Obs: obs || '',
+  }
+  console.log('[Feegow] Sending statusUpdate payload:', payload)
   return request('/appoints/statusUpdate', {
     method: 'POST',
-    body: JSON.stringify({ 
-        AgendamentoID: String(agendamento_id), 
-        StatusID: String(status_id), 
-        ...(obs ? { Obs: obs } : {}) 
-    }),
+    body: JSON.stringify(payload),
   })
+}
+
+/**
+ * Creates a Medical Report (Laudo) attached to an appointment.
+ * @param {Object} data
+ * @param {number|string} data.agendamento_id 
+ * @param {string} data.laudo_base64 
+ */
+export async function createMedicalReport({ agendamento_id, laudo_base64 }) {
+  const payload = {
+    agendamento_id: Number(agendamento_id),
+    laudo_base64
+  };
+
+  console.log(`[Feegow] Uploading PDF Laudo for appointment ${agendamento_id}...`);
+  return request('/medical-reports/create', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
 }

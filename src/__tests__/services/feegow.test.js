@@ -37,15 +37,27 @@ describe('fetchProfessionals', () => {
 })
 
 describe('updateAppointmentStatus', () => {
-  it('POSTs agendamento_id and status_id', async () => {
+  it('POSTs AgendamentoID, StatusID, and Obs', async () => {
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
     await updateAppointmentStatus({ agendamento_id: 1, status_id: 2, obs: 'Evolução' })
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/appoints/statusUpdate'),
-      expect.objectContaining({
-        method: 'POST',
-        body: expect.stringContaining('"agendamento_id":1'),
-      })
-    )
+
+    const [, options] = mockFetch.mock.calls[0]
+    const body = JSON.parse(options.body)
+
+    expect(options.method).toBe('POST')
+    expect(body.AgendamentoID).toBe('1')
+    expect(body.StatusID).toBe('2')
+    expect(body.Obs).toBe('Evolução')
+  })
+
+  it('sends Obs as empty string when obs is falsy', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+    await updateAppointmentStatus({ agendamento_id: 1, status_id: 3 })
+
+    const [, options] = mockFetch.mock.calls[0]
+    const body = JSON.parse(options.body)
+
+    expect(body).toHaveProperty('Obs')
+    expect(body.Obs).toBe('')
   })
 })

@@ -27,12 +27,14 @@ export default async function handler(req, res) {
             headers: {
                 'x-access-token': token,
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
             },
         };
 
         // Forward body for POST/PUT/PATCH
         if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
             fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+            console.log(`[Proxy] ${req.method} ${pathStr} — body:`, fetchOptions.body);
         }
 
         const response = await fetch(url.toString(), fetchOptions);

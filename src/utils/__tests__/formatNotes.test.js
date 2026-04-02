@@ -9,7 +9,7 @@ describe('formatNotes utility', () => {
             evolution: 'Paciente relatou melhora nas dores lombares.'
         };
 
-        const expected = `[Procedimentos: Consulta, Avaliação postural]\n[Próximos passos: Retorno em 30 dias]\nEvolução: Paciente relatou melhora nas dores lombares.`;
+        const expected = `[Procedimentos: Consulta, Avaliação postural] | [Próximos passos: Retorno em 30 dias] | Evolução: Paciente relatou melhora nas dores lombares.`;
         expect(formatNotes(input)).toBe(expected);
     });
 
@@ -20,7 +20,7 @@ describe('formatNotes utility', () => {
             evolution: 'Sem queixas.'
         };
 
-        const expected = `[Próximos passos: Retorno em 30 dias]\nEvolução: Sem queixas.`;
+        const expected = `[Próximos passos: Retorno em 30 dias] | Evolução: Sem queixas.`;
         expect(formatNotes(input)).toBe(expected);
     });
 
@@ -31,7 +31,7 @@ describe('formatNotes utility', () => {
             evolution: 'Tudo ok.'
         };
 
-        const expected = `[Procedimentos: Consulta]\nEvolução: Tudo ok.`;
+        const expected = `[Procedimentos: Consulta] | Evolução: Tudo ok.`;
         expect(formatNotes(input)).toBe(expected);
     });
 
@@ -42,7 +42,7 @@ describe('formatNotes utility', () => {
             evolution: ''
         };
 
-        const expected = `[Procedimentos: Consulta]\n[Próximos passos: Retorno]`;
+        const expected = `[Procedimentos: Consulta] | [Próximos passos: Retorno]`;
         expect(formatNotes(input)).toBe(expected);
     });
 

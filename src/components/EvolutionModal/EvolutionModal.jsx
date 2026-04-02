@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AttendanceRow } from './AttendanceRow';
 import { ProcedureTags } from './ProcedureTags';
-import { updateAppointmentStatus } from '../../services/feegow';
+import { updateAppointmentStatus, createMedicalReport } from '../../services/feegow';
 import { formatNotes } from '../../utils/formatNotes';
+import { generateEvolutionPdfBase64 } from '../../utils/generatePdf';
 
 export function EvolutionModal({ appointment, procedureMap = {}, onClose, onSuccess }) {
     const initialStatus = appointment?.status_id === 2 ? 3 : (appointment?.status_id || 3);
@@ -38,10 +39,31 @@ export function EvolutionModal({ appointment, procedureMap = {}, onClose, onSucc
                 evolution: evolutionText,
             });
 
+            // 1. Atualiza Status
             await updateAppointmentStatus({
                 agendamento_id: appointment.agendamento_id,
                 status_id: statusId,
                 obs: formattedNotes,
+            });
+
+            // 2. Gera o PDF Base64 da Evolução
+            const dateStr = new Intl.DateTimeFormat('pt-BR').format(new Date());
+            const timeStr = appointment.horario?.substring(0, 5) || '--:--';
+
+            const pdfBase64 = await generateEvolutionPdfBase64({
+                patientName: appointment.paciente_nome || 'Paciente não identificado',
+                date: dateStr,
+                time: timeStr,
+                professionalName: appointment.profissional_nome || '',
+                procedures: procedures,
+                nextSteps: nextSteps,
+                evolutionText: evolutionText
+            });
+
+            // 3. Envia Laudo/Prontuário
+            await createMedicalReport({
+                agendamento_id: appointment.agendamento_id,
+                laudo_base64: pdfBase64
             });
 
             onSuccess();
