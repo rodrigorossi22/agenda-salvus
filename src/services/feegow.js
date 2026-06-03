@@ -99,3 +99,83 @@ export async function createMedicalReport({ agendamento_id, laudo_base64 }) {
     body: JSON.stringify(payload)
   });
 }
+
+export async function searchPatient({ cpf, telefone }) {
+  const params = new URLSearchParams()
+  params.set('limit', '50')
+  params.set('offset', '0')
+
+  const cleanCpf = cpf ? cpf.replace(/\D/g, '') : ''
+  const cleanTelefone = telefone ? telefone.replace(/\D/g, '') : ''
+
+  if (cleanCpf.length > 0) {
+    params.set('cpf', cleanCpf)
+  } else if (cleanTelefone.length > 0) {
+    params.set('telefone', cleanTelefone)
+  } else {
+    return null
+  }
+
+  const data = await request(`/patient/list?${params}`)
+  const list = data.content || []
+  if (list.length > 0 && list[0].patient_id) {
+    return list[0].patient_id
+  }
+  return null
+}
+
+export async function createPatient({ nome_completo, celular, cpf, origem_id = 20 }) {
+  const payload = {
+    nome_completo,
+    celular1: celular.replace(/\D/g, ''),
+    origem_id: Number(origem_id),
+  }
+
+  const cleanCpf = cpf ? cpf.replace(/\D/g, '') : ''
+  if (cleanCpf.length > 0) {
+    payload.cpf = cleanCpf
+  } else {
+    payload.sem_cpf = true
+  }
+
+  const data = await request('/patient/create', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+
+  return data.content?.paciente_id || null
+}
+
+export async function createAppointment({ local_id, paciente_id, procedimento_id, data, horario, notas }) {
+  const payload = {
+    local_id: Number(local_id),
+    paciente_id: Number(paciente_id),
+    profissional_id: 15,
+    especialidade_id: 246,
+    procedimento_id: Number(procedimento_id),
+    data, // Formato dd-mm-YYYY
+    horario, // Formato HH:MM:SS
+    plano: 0,
+    convenio_id: 0,
+    notas: notas || 'Agendamento realizado via link online de pacientes.',
+  }
+
+  return request('/appoints/new-appoint', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function fetchAvailableSchedule({ procedimento_id, data_start, data_end }) {
+  const params = new URLSearchParams({
+    tipo: 'P',
+    procedimento_id: String(procedimento_id),
+    profissional_id: '15',
+    data_start,
+    data_end,
+  })
+
+  const data = await request(`/appoints/available-schedule?${params}`)
+  return data.content || {}
+}
+
