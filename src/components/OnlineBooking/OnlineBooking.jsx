@@ -3,6 +3,7 @@ import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchAvailableSchedule, searchPatient, createPatient, createAppointment } from '../../services/feegow'
+import salvusLogo from '../../assets/logo_transparent.png'
 
 const PROCEDURES = [
   { id: 249, name: 'Shape Detox', duration: 90, desc: 'Tratamento corporal completo para redução de medidas e eliminação de toxinas.' },
@@ -224,8 +225,8 @@ export default function OnlineBooking() {
   }, [weekdays])
 
   const renderProcedureStage = () => (
-    <div className="w-full max-w-4xl px-4 py-8">
-      <header className="text-center mb-12">
+    <div className="w-full max-w-4xl px-4">
+      <header className="text-center mb-10">
         <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Agendamento Online</span>
         <h2 className="text-4xl font-serif mt-2 text-[#2e2a25]">Agenda Recovery e Bem-estar</h2>
         <p className="text-sm text-[#7a7065] mt-2">Profissional: Monica Sousa</p>
@@ -258,14 +259,14 @@ export default function OnlineBooking() {
     const hasSlots = Object.keys(availableSlots).length > 0
 
     return (
-      <div className="w-full max-w-3xl px-4 py-8">
+      <div className="w-full max-w-3xl px-4">
         <button 
           onClick={() => {
             setSelectedProcedure(null)
             setSelectedTime(null)
             setStage(STAGES.PROCEDURE)
           }}
-          className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-8 transition-colors"
+          className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-6 transition-colors"
         >
           ← Voltar para Procedimentos
         </button>
@@ -414,10 +415,10 @@ export default function OnlineBooking() {
   }
 
   const renderFormStage = () => (
-    <div className="w-full max-w-md px-4 py-8">
+    <div className="w-full max-w-md px-4">
       <button 
         onClick={() => setStage(STAGES.DATETIME)}
-        className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-8 transition-colors"
+        className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-6 transition-colors"
       >
         ← Voltar para Horários
       </button>
@@ -493,7 +494,7 @@ export default function OnlineBooking() {
   )
 
   const renderSuccessStage = () => (
-    <div className="w-full max-w-md px-4 py-8 text-center">
+    <div className="w-full max-w-md px-4 text-center">
       <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#c5a059]/10 text-[#c5a059] mb-6 border border-[#c5a059]/20 shadow-sm">
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
@@ -542,7 +543,11 @@ export default function OnlineBooking() {
   )
 
   return (
-    <div className="min-h-screen bg-[#fdfbf7] text-[#2e2a25] flex items-center justify-center font-sans">
+    <div className="min-h-screen bg-[#fdfbf7] text-[#2e2a25] flex flex-col items-center justify-start py-10 font-sans">
+      <div className="mb-6 flex justify-center">
+        <img src={salvusLogo} alt="Clínica Salvus" className="h-20 md:h-24 object-contain" />
+      </div>
+      
       <AnimatePresence mode="wait">
         <motion.div
           key={stage}
