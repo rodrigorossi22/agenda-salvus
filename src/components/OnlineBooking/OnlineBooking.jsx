@@ -133,14 +133,16 @@ export default function OnlineBooking() {
       }
     }
 
-    morning.sort()
-    afternoon.sort()
-    evening.sort()
+    // Helper to get 3 random slots and sort them chronologically
+    const getRandomSlots = (array, count = 3) => {
+      if (array.length <= count) return [...array].sort()
+      const shuffled = [...array].sort(() => 0.5 - Math.random())
+      return shuffled.slice(0, count).sort()
+    }
 
-    // Apply scarcity rule: Max 3 per period
-    const limitedMorning = morning.slice(0, 3)
-    const limitedAfternoon = afternoon.slice(0, 3)
-    const limitedEvening = evening.slice(0, 3)
+    const limitedMorning = getRandomSlots(morning, 3)
+    const limitedAfternoon = getRandomSlots(afternoon, 3)
+    const limitedEvening = getRandomSlots(evening, 3)
 
     return {
       morning: limitedMorning,
