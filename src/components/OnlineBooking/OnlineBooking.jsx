@@ -26,6 +26,10 @@ export default function OnlineBooking() {
   const [selectedLocalId, setSelectedLocalId] = useState(null)
   const [availableSlots, setAvailableSlots] = useState({})
   const [loadingSlots, setLoadingSlots] = useState(false)
+  
+  // Custom active professional for testing purposes
+  const [activeProfessionalId, setActiveProfessionalId] = useState('15')
+  const [isTestMode, setIsTestMode] = useState(false)
 
   // Form fields
   const [name, setName] = useState('')
@@ -66,11 +70,12 @@ export default function OnlineBooking() {
       const data = await fetchAvailableSchedule({
         procedimento_id: selectedProcedure.id,
         data_start: todayStr,
-        data_end: futureStr
+        data_end: futureStr,
+        profissional_id: activeProfessionalId
       })
       
-      // Nesting resolution: content.profissional_id["15"].local_id
-      const localMap = data.profissional_id?.['15']?.local_id || {}
+      // Nesting resolution: content.profissional_id[activeProfessionalId].local_id
+      const localMap = data.profissional_id?.[activeProfessionalId]?.local_id || {}
       setAvailableSlots(localMap)
     } catch (err) {
       console.error(err)
@@ -80,10 +85,10 @@ export default function OnlineBooking() {
     }
   }
 
-  // Load available slots when procedure changes
+  // Load available slots when procedure or active professional changes
   useEffect(() => {
     loadSlots()
-  }, [selectedProcedure])
+  }, [selectedProcedure, activeProfessionalId])
 
   // Filter slots based on the Date and apply Scarcity rules
   const scarcitySlotsForDate = useMemo(() => {
@@ -167,7 +172,8 @@ export default function OnlineBooking() {
         procedimento_id: selectedProcedure.id,
         data: formattedDate,
         horario: selectedTime,
-        notas: `Agendamento automático via link online (Mônica). Origem/UTM: ID ${getOrigemId()}.`
+        notas: `Agendamento automático via link online (Mônica). Origem/UTM: ID ${getOrigemId()}.`,
+        profissional_id: activeProfessionalId
       })
 
       setAppointmentDetails({
@@ -191,12 +197,38 @@ export default function OnlineBooking() {
     }
   }
 
+  // Weekdays only horizontal list builder (14 days, skipping sat/sun)
+  const weekdays = useMemo(() => {
+    const list = []
+    let current = new Date()
+    while (list.length < 14) {
+      const dayOfWeek = current.getDay() // 0 = Sunday, 6 = Saturday
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        list.push(new Date(current))
+      }
+      current = addDays(current, 1)
+    }
+    return list
+  }, [])
+
+  // Auto-reset selected date to first weekday if today is weekend
+  useEffect(() => {
+    if (weekdays.length > 0) {
+      const todayKey = format(new Date(), 'yyyy-MM-dd')
+      const selectedKey = format(selectedDate, 'yyyy-MM-dd')
+      const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6
+      if (isWeekend && todayKey === selectedKey) {
+        setSelectedDate(weekdays[0])
+      }
+    }
+  }, [weekdays])
+
   const renderProcedureStage = () => (
     <div className="w-full max-w-4xl px-4 py-8">
       <header className="text-center mb-12">
         <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Agendamento Online</span>
-        <h2 className="text-4xl font-serif mt-2 text-[#f5f5f5]">Monica Sousa</h2>
-        <p className="text-sm text-[#a29382] mt-2">Escolha um procedimento para verificar horários disponíveis.</p>
+        <h2 className="text-4xl font-serif mt-2 text-[#2e2a25]">Agenda Recovery e Bem-estar</h2>
+        <p className="text-sm text-[#7a7065] mt-2">Profissional: Monica Sousa</p>
       </header>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -207,15 +239,15 @@ export default function OnlineBooking() {
               setSelectedProcedure(proc)
               setStage(STAGES.DATETIME)
             }}
-            className="group border border-[#333] bg-[#111] hover:border-[#c5a059] p-6 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg hover:shadow-[#c5a059]/5"
+            className="group border border-[#e6e2dc] bg-white hover:border-[#c5a059] p-6 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg hover:shadow-[#a29382]/10"
           >
             <div className="flex justify-between items-center mb-3">
-              <h3 className="text-xl font-medium text-[#f5f5f5] group-hover:text-[#c5a059] transition-colors">{proc.name}</h3>
+              <h3 className="text-xl font-medium text-[#2e2a25] group-hover:text-[#c5a059] transition-colors">{proc.name}</h3>
               <span className="text-xs bg-[#c5a059]/10 text-[#c5a059] font-semibold px-2 py-1 rounded">
                 {proc.duration} min
               </span>
             </div>
-            <p className="text-sm text-[#888] leading-relaxed">{proc.desc}</p>
+            <p className="text-sm text-[#7a7065] leading-relaxed">{proc.desc}</p>
           </div>
         ))}
       </div>
@@ -223,7 +255,7 @@ export default function OnlineBooking() {
   )
 
   const renderDateTimeStage = () => {
-    const days = Array.from({ length: 14 }).map((_, i) => addDays(new Date(), i))
+    const hasSlots = Object.keys(availableSlots).length > 0
 
     return (
       <div className="w-full max-w-3xl px-4 py-8">
@@ -233,24 +265,63 @@ export default function OnlineBooking() {
             setSelectedTime(null)
             setStage(STAGES.PROCEDURE)
           }}
-          className="flex items-center text-sm text-[#a29382] hover:text-[#c5a059] mb-8 transition-colors"
+          className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-8 transition-colors"
         >
           ← Voltar para Procedimentos
         </button>
 
         <header className="mb-8">
           <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Procedimento</span>
-          <h2 className="text-2xl font-serif mt-1 text-[#f5f5f5]">{selectedProcedure.name}</h2>
-          <p className="text-sm text-[#a29382] mt-1">Duração média de {selectedProcedure.duration} minutos.</p>
+          <h2 className="text-2xl font-serif mt-1 text-[#2e2a25]">{selectedProcedure.name}</h2>
+          <p className="text-sm text-[#7a7065] mt-1">Profissional: Monica Sousa</p>
         </header>
+
+        {/* Test Mode Notification Banners */}
+        {activeProfessionalId === '15' && !hasSlots && !loadingSlots && (
+          <div className="mb-6 p-4 rounded-lg bg-[#faf0e6] border border-[#e6d0ba] text-[#8c6d53] text-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div>
+              <p className="font-semibold">⚠️ Sem horários cadastrados</p>
+              <p className="text-xs mt-1 text-[#9e826c]">
+                A profissional Monica Sousa (ID 15) não possui horários ativos no Feegow. 
+                Para testar o fluxo de agendamento localmente, clique no botão ao lado para carregar a agenda de teste (Dr. Deangelo ID 1).
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setActiveProfessionalId('1')
+                setIsTestMode(true)
+              }}
+              className="bg-[#c5a059] hover:bg-[#b08e4f] text-white text-xs font-semibold px-4 py-2 rounded transition-colors whitespace-nowrap shadow-sm"
+            >
+              Usar Agenda de Teste
+            </button>
+          </div>
+        )}
+
+        {isTestMode && activeProfessionalId === '1' && (
+          <div className="mb-6 p-3 rounded-lg bg-[#ebf3e3] border border-[#c6dcae] text-[#5c7a40] text-xs flex justify-between items-center shadow-sm">
+            <span>
+              🛠️ <strong>Modo de Teste Ativo:</strong> Carregando horários do Dr. Deangelo (ID 1). O agendamento final será registrado nesta agenda.
+            </span>
+            <button 
+              onClick={() => {
+                setActiveProfessionalId('15')
+                setIsTestMode(false)
+              }}
+              className="text-[#5c7a40] hover:underline font-bold ml-2 whitespace-nowrap"
+            >
+              Restaurar Monica (ID 15)
+            </button>
+          </div>
+        )}
 
         {/* Connection Error Banner with Try Again Button */}
         {errorMessage && (
-          <div className="mb-6 p-4 rounded-lg bg-red-950/30 border border-red-900/50 text-red-400 text-sm flex justify-between items-center leading-relaxed">
+          <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex justify-between items-center leading-relaxed">
             <span>{errorMessage}</span>
             <button 
               onClick={loadSlots}
-              className="bg-[#c5a059] text-black text-xs font-semibold px-3 py-1.5 rounded hover:bg-[#b08e4f] transition-colors"
+              className="bg-[#c5a059] text-white text-xs font-semibold px-3 py-1.5 rounded hover:bg-[#b08e4f] transition-colors"
             >
               Tentar Novamente
             </button>
@@ -259,9 +330,9 @@ export default function OnlineBooking() {
 
         {/* Quick Date Selector tabs */}
         <div className="mb-8">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-[#a29382] mb-3">1. Escolha o Dia</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-3">1. Escolha o Dia</h3>
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-thin">
-            {days.map((day, idx) => {
+            {weekdays.map((day, idx) => {
               const isSelected = format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
               return (
                 <button
@@ -273,10 +344,10 @@ export default function OnlineBooking() {
                   className={`flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-lg border transition-all duration-200 ${
                     isSelected 
                       ? 'border-[#c5a059] bg-[#c5a059]/10 text-[#c5a059]' 
-                      : 'border-[#333] bg-[#111] text-[#888] hover:border-[#a29382] hover:text-[#f5f5f5]'
+                      : 'border-[#e6e2dc] bg-white text-[#7a7065] hover:border-[#a29382] hover:text-[#2e2a25]'
                   }`}
                 >
-                  <span className="text-xs uppercase font-medium">{format(day, 'eee', { locale: ptBR })}</span>
+                  <span className="text-[10px] uppercase font-medium">{format(day, 'eee', { locale: ptBR })}</span>
                   <span className="text-xl font-bold mt-1">{format(day, 'd')}</span>
                   <span className="text-[10px] uppercase">{format(day, 'MMM', { locale: ptBR })}</span>
                 </button>
@@ -287,10 +358,10 @@ export default function OnlineBooking() {
 
         {/* Time Selector grids */}
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-[#a29382] mb-4">2. Horários Disponíveis</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-4">2. Horários Disponíveis</h3>
 
           {loadingSlots ? (
-            <div className="flex justify-center items-center py-12 text-[#a29382]">
+            <div className="flex justify-center items-center py-12 text-[#7a7065]">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#c5a059] border-t-transparent mr-2" />
               Consultando agenda da Feegow...
             </div>
@@ -298,16 +369,16 @@ export default function OnlineBooking() {
             <div className="space-y-8">
               {/* Morning section */}
               <div>
-                <h4 className="text-sm font-medium text-[#888] mb-3 border-b border-[#222] pb-1">Manhã</h4>
+                <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Manhã</h4>
                 {scarcitySlotsForDate.morning.length === 0 ? (
-                  <p className="text-xs text-[#555] italic">Sem horários livres no turno da manhã.</p>
+                  <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da manhã.</p>
                 ) : (
                   <div className="grid grid-cols-3 gap-3">
                     {scarcitySlotsForDate.morning.map(time => (
                       <button
                         key={time}
                         onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
-                        className="bg-[#111] hover:bg-[#c5a059] border border-[#333] hover:border-[#c5a059] text-[#f5f5f5] hover:text-black font-medium py-3 rounded-lg text-sm text-center transition-all duration-200"
+                        className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm"
                       >
                         {time.substring(0, 5)}
                       </button>
@@ -318,16 +389,16 @@ export default function OnlineBooking() {
 
               {/* Afternoon section */}
               <div>
-                <h4 className="text-sm font-medium text-[#888] mb-3 border-b border-[#222] pb-1">Tarde</h4>
+                <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Tarde</h4>
                 {scarcitySlotsForDate.afternoon.length === 0 ? (
-                  <p className="text-xs text-[#555] italic">Sem horários livres no turno da tarde.</p>
+                  <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da tarde.</p>
                 ) : (
                   <div className="grid grid-cols-3 gap-3">
                     {scarcitySlotsForDate.afternoon.map(time => (
                       <button
                         key={time}
                         onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
-                        className="bg-[#111] hover:bg-[#c5a059] border border-[#333] hover:border-[#c5a059] text-[#f5f5f5] hover:text-black font-medium py-3 rounded-lg text-sm text-center transition-all duration-200"
+                        className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm"
                       >
                         {time.substring(0, 5)}
                       </button>
@@ -346,71 +417,71 @@ export default function OnlineBooking() {
     <div className="w-full max-w-md px-4 py-8">
       <button 
         onClick={() => setStage(STAGES.DATETIME)}
-        className="flex items-center text-sm text-[#a29382] hover:text-[#c5a059] mb-8 transition-colors"
+        className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-8 transition-colors"
       >
         ← Voltar para Horários
       </button>
 
-      <header className="mb-8 border-b border-[#222] pb-4">
+      <header className="mb-8 border-b border-[#e6e2dc] pb-4">
         <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Você selecionou</span>
-        <h2 className="text-xl font-serif mt-1 text-[#f5f5f5]">{selectedProcedure.name}</h2>
-        <p className="text-sm text-[#a29382] mt-1">
-          Dia {format(selectedDate, 'dd/MM/yyyy')} às {selectedTime.substring(0, 5)} com Monica Sousa
+        <h2 className="text-xl font-serif mt-1 text-[#2e2a25]">{selectedProcedure.name}</h2>
+        <p className="text-sm text-[#7a7065] mt-1">
+          Dia {format(selectedDate, 'dd/MM/yyyy')} às {selectedTime.substring(0, 5)} com Monica Sousa {isTestMode && '(Agenda Teste)'}
         </p>
       </header>
 
       {errorMessage && (
-        <div className="mb-6 p-4 rounded-lg bg-red-950/30 border border-red-900/50 text-red-400 text-sm leading-relaxed">
+        <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm leading-relaxed">
           {errorMessage}
         </div>
       )}
 
       <form onSubmit={handleBooking} className="space-y-6">
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-widest text-[#a29382] mb-2">Nome Completo *</label>
+          <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">Nome Completo *</label>
           <input 
             type="text" 
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="Digite seu nome completo"
             required
-            className="w-full bg-[#111] border border-[#333] rounded-lg px-4 py-3 text-[#f5f5f5] placeholder-[#555] focus:outline-none focus:border-[#c5a059] transition-colors"
+            className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-widest text-[#a29382] mb-2">WhatsApp / Celular *</label>
+          <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">WhatsApp / Celular *</label>
           <input 
             type="tel" 
             value={phone}
             onChange={e => setPhone(e.target.value)}
             placeholder="(DD) 99999-9999"
             required
-            className="w-full bg-[#111] border border-[#333] rounded-lg px-4 py-3 text-[#f5f5f5] placeholder-[#555] focus:outline-none focus:border-[#c5a059] transition-colors"
+            className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-widest text-[#a29382] mb-2">
-            CPF <span className="text-[10px] text-[#555] font-normal">(Opcional - ajuda a validar seu cadastro)</span>
+          <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">
+            CPF <span className="text-[10px] text-[#a29382] font-normal">(Opcional - ajuda a validar seu cadastro)</span>
           </label>
           <input 
             type="text" 
             value={cpf}
             onChange={e => setCpf(e.target.value)}
             placeholder="000.000.000-00"
-            className="w-full bg-[#111] border border-[#333] rounded-lg px-4 py-3 text-[#f5f5f5] placeholder-[#555] focus:outline-none focus:border-[#c5a059] transition-colors"
+            className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
           />
         </div>
 
         <button 
           type="submit"
           disabled={submitting}
-          className="w-full bg-[#c5a059] disabled:bg-[#c5a059]/50 hover:bg-[#b08e4f] text-black font-bold py-4 rounded-lg uppercase tracking-widest text-xs transition-colors flex items-center justify-center"
+          className="w-full bg-[#c5a059] disabled:bg-[#c5a059]/50 hover:bg-[#b08e4f] text-white font-bold py-4 rounded-lg uppercase tracking-widest text-xs transition-colors flex items-center justify-center shadow-md cursor-pointer"
         >
           {submitting ? (
             <>
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent mr-2" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
               Confirmando na Feegow...
             </>
           ) : (
@@ -423,34 +494,34 @@ export default function OnlineBooking() {
 
   const renderSuccessStage = () => (
     <div className="w-full max-w-md px-4 py-8 text-center">
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#c5a059]/10 text-[#c5a059] mb-6 border border-[#c5a059]/20">
+      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#c5a059]/10 text-[#c5a059] mb-6 border border-[#c5a059]/20 shadow-sm">
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
         </svg>
       </div>
-      <h2 className="text-3xl font-serif text-[#f5f5f5] mb-2">Agendamento Realizado!</h2>
-      <p className="text-sm text-[#a29382] mb-8 leading-relaxed">
+      <h2 className="text-3xl font-serif text-[#2e2a25] mb-2">Agendamento Realizado!</h2>
+      <p className="text-sm text-[#7a7065] mb-8 leading-relaxed">
         Seu horário com Monica Sousa foi registrado com sucesso na Feegow. Te esperamos!
       </p>
 
-      <div className="bg-[#111] border border-[#222] rounded-xl p-6 text-left space-y-4 mb-8">
+      <div className="bg-[#faf9f6] border border-[#e6e2dc] rounded-xl p-6 text-left space-y-4 mb-8 shadow-sm">
         <div>
-          <span className="text-[10px] uppercase font-semibold tracking-widest text-[#555] block">Procedimento</span>
-          <span className="text-[#f5f5f5] font-medium">{appointmentDetails?.procedureName}</span>
+          <span className="text-[10px] uppercase font-semibold tracking-widest text-[#7a7065] block">Procedimento</span>
+          <span className="text-[#2e2a25] font-medium">{appointmentDetails?.procedureName}</span>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <span className="text-[10px] uppercase font-semibold tracking-widest text-[#555] block">Data</span>
-            <span className="text-[#f5f5f5] font-medium">{appointmentDetails?.date}</span>
+            <span className="text-[10px] uppercase font-semibold tracking-widest text-[#7a7065] block">Data</span>
+            <span className="text-[#2e2a25] font-medium">{appointmentDetails?.date}</span>
           </div>
           <div>
-            <span className="text-[10px] uppercase font-semibold tracking-widest text-[#555] block">Horário</span>
-            <span className="text-[#f5f5f5] font-medium">{appointmentDetails?.time}h</span>
+            <span className="text-[10px] uppercase font-semibold tracking-widest text-[#7a7065] block">Horário</span>
+            <span className="text-[#2e2a25] font-medium">{appointmentDetails?.time}h</span>
           </div>
         </div>
         <div>
-          <span className="text-[10px] uppercase font-semibold tracking-widest text-[#555] block">Profissional</span>
-          <span className="text-[#f5f5f5] font-medium">Monica Sousa</span>
+          <span className="text-[10px] uppercase font-semibold tracking-widest text-[#7a7065] block">Profissional</span>
+          <span className="text-[#2e2a25] font-medium">Monica Sousa</span>
         </div>
       </div>
 
@@ -471,7 +542,7 @@ export default function OnlineBooking() {
   )
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-[#f5f5f5] flex items-center justify-center font-sans">
+    <div className="min-h-screen bg-[#fdfbf7] text-[#2e2a25] flex items-center justify-center font-sans">
       <AnimatePresence mode="wait">
         <motion.div
           key={stage}

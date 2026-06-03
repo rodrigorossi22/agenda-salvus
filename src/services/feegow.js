@@ -146,11 +146,11 @@ export async function createPatient({ nome_completo, celular, cpf, origem_id = 2
   return data.content?.paciente_id || null
 }
 
-export async function createAppointment({ local_id, paciente_id, procedimento_id, data, horario, notas }) {
+export async function createAppointment({ local_id, paciente_id, procedimento_id, data, horario, notas, profissional_id = 15 }) {
   const payload = {
     local_id: Number(local_id),
     paciente_id: Number(paciente_id),
-    profissional_id: 15,
+    profissional_id: Number(profissional_id),
     especialidade_id: 246,
     procedimento_id: Number(procedimento_id),
     data, // Formato dd-mm-YYYY
@@ -166,11 +166,11 @@ export async function createAppointment({ local_id, paciente_id, procedimento_id
   })
 }
 
-export async function fetchAvailableSchedule({ procedimento_id, data_start, data_end }) {
+export async function fetchAvailableSchedule({ procedimento_id, data_start, data_end, profissional_id = '15' }) {
   const params = new URLSearchParams({
     tipo: 'P',
     procedimento_id: String(procedimento_id),
-    profissional_id: '15',
+    profissional_id: String(profissional_id),
     data_start,
     data_end,
   })
