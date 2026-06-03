@@ -160,6 +160,7 @@ describe('createAppointment', () => {
     expect(body.data).toBe('03-06-2026')
     expect(body.horario).toBe('14:30:00')
     expect(body.plano).toBe(0)
+    expect(body.valor).toBe(0)
     expect(body.notas).toBe('Agendamento online de teste com a Monica.')
   })
 })

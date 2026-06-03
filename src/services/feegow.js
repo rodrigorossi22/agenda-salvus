@@ -157,6 +157,7 @@ export async function createAppointment({ local_id, paciente_id, procedimento_id
     horario, // Formato HH:MM:SS
     plano: 0,
     convenio_id: 0,
+    valor: 0,
     notas: notas || 'Agendamento realizado via link online de pacientes.',
   }
 
