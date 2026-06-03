@@ -115,10 +115,10 @@ export default function OnlineBooking() {
         foundLocalId = localId
 
         // Filter: Keep slot only if:
-        // 1. It starts before 19:30:00 (since Monica stops serving at 20:00, the last 60-min slot starts at 19:00)
+        // 1. It starts before 20:00:00 (since Monica stops serving at 20:30, the last 60-min slot starts at 19:30)
         // 2. The subsequent 30-min block is also available (requires 60 min total)
         const validSlots = dateSlots.filter(time => {
-          if (time >= '19:30:00') return false
+          if (time >= '20:00:00') return false
           const nextTime = add30Minutes(time)
           return dateSlots.includes(nextTime)
         })
