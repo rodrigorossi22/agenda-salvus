@@ -5,23 +5,20 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { fetchAvailableSchedule, searchPatient, createPatient, createAppointment } from '../../services/feegow'
 import salvusLogo from '../../assets/logo_transparent.png'
 
-const PROCEDURES = [
-  { id: 249, name: 'Shape Detox', duration: 90, desc: 'Tratamento corporal completo para redução de medidas e eliminação de toxinas.' },
-  { id: 54, name: 'Limpeza de Pele', duration: 90, desc: 'Limpeza profunda com extração, esfoliação e hidratação.' },
-  { id: 92, name: 'Drenagem Linfática', duration: 60, desc: 'Massagem terapêutica para redução de retenção de líquidos e inchaços.' },
-  { id: 149, name: 'Outros', duration: 60, desc: 'Agende uma avaliação inicial estética com a profissional Monica Sousa.' }
-]
+const DEFAULT_PROCEDURE = {
+  id: 149, // Outros (Consulta de Avaliação Estética) na Feegow
+  name: 'Atendimento Estético',
+  duration: 60
+}
 
 const STAGES = {
-  PROCEDURE: 'PROCEDURE',
   DATETIME: 'DATETIME',
   FORM: 'FORM',
   SUCCESS: 'SUCCESS'
 }
 
 export default function OnlineBooking() {
-  const [stage, setStage] = useState(STAGES.PROCEDURE)
-  const [selectedProcedure, setSelectedProcedure] = useState(null)
+  const [stage, setStage] = useState(STAGES.DATETIME)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedTime, setSelectedTime] = useState(null)
   const [selectedLocalId, setSelectedLocalId] = useState(null)
@@ -62,14 +59,13 @@ export default function OnlineBooking() {
 
   // Load available slots function
   const loadSlots = async () => {
-    if (!selectedProcedure) return
     setLoadingSlots(true)
     setErrorMessage(null)
     try {
       const todayStr = format(new Date(), 'dd-MM-yyyy')
       const futureStr = format(addDays(new Date(), 30), 'dd-MM-yyyy')
       const data = await fetchAvailableSchedule({
-        procedimento_id: selectedProcedure.id,
+        procedimento_id: DEFAULT_PROCEDURE.id,
         data_start: todayStr,
         data_end: futureStr,
         profissional_id: activeProfessionalId
@@ -86,12 +82,12 @@ export default function OnlineBooking() {
     }
   }
 
-  // Load available slots when procedure or active professional changes
+  // Load available slots when active professional changes or component mounts
   useEffect(() => {
     loadSlots()
-  }, [selectedProcedure, activeProfessionalId])
+  }, [activeProfessionalId])
 
-  // Filter slots based on the Date and apply Scarcity rules
+  // Filter slots based on the Date, apply 60-min minimum duration filter and Scarcity rules
   const scarcitySlotsForDate = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd')
     
@@ -99,11 +95,31 @@ export default function OnlineBooking() {
     let afternoon = []
     let foundLocalId = null
 
+    // Helper to add 30 minutes to an HH:MM:SS time string
+    const add30Minutes = (timeStr) => {
+      const [h, m, s] = timeStr.split(':').map(Number)
+      let newM = m + 30
+      let newH = h
+      if (newM >= 60) {
+        newM -= 60
+        newH += 1
+      }
+      const pad = (n) => String(n).padStart(2, '0')
+      return `${pad(newH)}:${pad(newM)}:${pad(s)}`
+    }
+
     for (const localId of Object.keys(availableSlots)) {
       const dateSlots = availableSlots[localId]?.[dateKey] || []
       if (dateSlots.length > 0) {
         foundLocalId = localId
-        dateSlots.forEach(time => {
+
+        // Filter: Keep slot only if the subsequent 30-min block is also available (requires 60 min total)
+        const validSlots = dateSlots.filter(time => {
+          const nextTime = add30Minutes(time)
+          return dateSlots.includes(nextTime)
+        })
+
+        validSlots.forEach(time => {
           if (time < '12:00:00') {
             morning.push(time)
           } else {
@@ -170,7 +186,7 @@ export default function OnlineBooking() {
       await createAppointment({
         local_id: selectedLocalId || scarcitySlotsForDate.localId,
         paciente_id: patientId,
-        procedimento_id: selectedProcedure.id,
+        procedimento_id: DEFAULT_PROCEDURE.id,
         data: formattedDate,
         horario: selectedTime,
         notas: `Agendamento automático via link online (Mônica). Origem/UTM: ID ${getOrigemId()}.`,
@@ -178,7 +194,7 @@ export default function OnlineBooking() {
       })
 
       setAppointmentDetails({
-        procedureName: selectedProcedure.name,
+        procedureName: DEFAULT_PROCEDURE.name,
         date: format(selectedDate, 'dd/MM/yyyy'),
         time: selectedTime.substring(0, 5)
       })
@@ -224,57 +240,15 @@ export default function OnlineBooking() {
     }
   }, [weekdays])
 
-  const renderProcedureStage = () => (
-    <div className="w-full max-w-4xl px-4">
-      <header className="text-center mb-10">
-        <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Agendamento Online</span>
-        <h2 className="text-4xl font-serif mt-2 text-[#2e2a25]">Agenda Recovery e Bem-estar</h2>
-        <p className="text-sm text-[#7a7065] mt-2">Profissional: Monica Sousa</p>
-      </header>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        {PROCEDURES.map(proc => (
-          <div 
-            key={proc.id} 
-            onClick={() => {
-              setSelectedProcedure(proc)
-              setStage(STAGES.DATETIME)
-            }}
-            className="group border border-[#e6e2dc] bg-white hover:border-[#c5a059] p-6 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg hover:shadow-[#a29382]/10"
-          >
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-xl font-medium text-[#2e2a25] group-hover:text-[#c5a059] transition-colors">{proc.name}</h3>
-              <span className="text-xs bg-[#c5a059]/10 text-[#c5a059] font-semibold px-2 py-1 rounded">
-                {proc.duration} min
-              </span>
-            </div>
-            <p className="text-sm text-[#7a7065] leading-relaxed">{proc.desc}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-
   const renderDateTimeStage = () => {
     const hasSlots = Object.keys(availableSlots).length > 0
 
     return (
       <div className="w-full max-w-3xl px-4">
-        <button 
-          onClick={() => {
-            setSelectedProcedure(null)
-            setSelectedTime(null)
-            setStage(STAGES.PROCEDURE)
-          }}
-          className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-6 transition-colors"
-        >
-          ← Voltar para Procedimentos
-        </button>
-
-        <header className="mb-8">
-          <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Procedimento</span>
-          <h2 className="text-2xl font-serif mt-1 text-[#2e2a25]">{selectedProcedure.name}</h2>
-          <p className="text-sm text-[#7a7065] mt-1">Profissional: Monica Sousa</p>
+        <header className="mb-8 text-center">
+          <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Agendamento Online</span>
+          <h2 className="text-4xl font-serif mt-2 text-[#2e2a25]">Agenda Recovery e Bem-estar</h2>
+          <p className="text-sm text-[#7a7065] mt-2">Profissional: Monica Sousa</p>
         </header>
 
         {/* Test Mode Notification Banners */}
@@ -292,7 +266,7 @@ export default function OnlineBooking() {
                 setActiveProfessionalId('1')
                 setIsTestMode(true)
               }}
-              className="bg-[#c5a059] hover:bg-[#b08e4f] text-white text-xs font-semibold px-4 py-2 rounded transition-colors whitespace-nowrap shadow-sm"
+              className="bg-[#c5a059] hover:bg-[#b08e4f] text-white text-xs font-semibold px-4 py-2 rounded transition-colors whitespace-nowrap shadow-sm cursor-pointer"
             >
               Usar Agenda de Teste
             </button>
@@ -309,7 +283,7 @@ export default function OnlineBooking() {
                 setActiveProfessionalId('15')
                 setIsTestMode(false)
               }}
-              className="text-[#5c7a40] hover:underline font-bold ml-2 whitespace-nowrap"
+              className="text-[#5c7a40] hover:underline font-bold ml-2 whitespace-nowrap cursor-pointer"
             >
               Restaurar Monica (ID 15)
             </button>
@@ -322,7 +296,7 @@ export default function OnlineBooking() {
             <span>{errorMessage}</span>
             <button 
               onClick={loadSlots}
-              className="bg-[#c5a059] text-white text-xs font-semibold px-3 py-1.5 rounded hover:bg-[#b08e4f] transition-colors"
+              className="bg-[#c5a059] text-white text-xs font-semibold px-3 py-1.5 rounded hover:bg-[#b08e4f] transition-colors cursor-pointer"
             >
               Tentar Novamente
             </button>
@@ -342,7 +316,7 @@ export default function OnlineBooking() {
                     setSelectedDate(day)
                     setSelectedTime(null)
                   }}
-                  className={`flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-lg border transition-all duration-200 ${
+                  className={`flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-lg border transition-all duration-200 cursor-pointer ${
                     isSelected 
                       ? 'border-[#c5a059] bg-[#c5a059]/10 text-[#c5a059]' 
                       : 'border-[#e6e2dc] bg-white text-[#7a7065] hover:border-[#a29382] hover:text-[#2e2a25]'
@@ -379,7 +353,7 @@ export default function OnlineBooking() {
                       <button
                         key={time}
                         onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
-                        className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm"
+                        className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
                       >
                         {time.substring(0, 5)}
                       </button>
@@ -399,7 +373,7 @@ export default function OnlineBooking() {
                       <button
                         key={time}
                         onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
-                        className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm"
+                        className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
                       >
                         {time.substring(0, 5)}
                       </button>
@@ -418,14 +392,14 @@ export default function OnlineBooking() {
     <div className="w-full max-w-md px-4">
       <button 
         onClick={() => setStage(STAGES.DATETIME)}
-        className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-6 transition-colors"
+        className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-6 transition-colors cursor-pointer"
       >
         ← Voltar para Horários
       </button>
 
       <header className="mb-8 border-b border-[#e6e2dc] pb-4">
         <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Você selecionou</span>
-        <h2 className="text-xl font-serif mt-1 text-[#2e2a25]">{selectedProcedure.name}</h2>
+        <h2 className="text-xl font-serif mt-1 text-[#2e2a25]">Atendimento Estético</h2>
         <p className="text-sm text-[#7a7065] mt-1">
           Dia {format(selectedDate, 'dd/MM/yyyy')} às {selectedTime.substring(0, 5)} com Monica Sousa {isTestMode && '(Agenda Teste)'}
         </p>
@@ -507,8 +481,8 @@ export default function OnlineBooking() {
 
       <div className="bg-[#faf9f6] border border-[#e6e2dc] rounded-xl p-6 text-left space-y-4 mb-8 shadow-sm">
         <div>
-          <span className="text-[10px] uppercase font-semibold tracking-widest text-[#7a7065] block">Procedimento</span>
-          <span className="text-[#2e2a25] font-medium">{appointmentDetails?.procedureName}</span>
+          <span className="text-[10px] uppercase font-semibold tracking-widest text-[#7a7065] block">Atendimento</span>
+          <span className="text-[#2e2a25] font-medium">Atendimento Estético</span>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -528,14 +502,13 @@ export default function OnlineBooking() {
 
       <button 
         onClick={() => {
-          setSelectedProcedure(null)
           setSelectedTime(null)
           setName('')
           setPhone('')
           setCpf('')
-          setStage(STAGES.PROCEDURE)
+          setStage(STAGES.DATETIME)
         }}
-        className="text-xs uppercase tracking-widest text-[#c5a059] hover:underline font-semibold"
+        className="text-xs uppercase tracking-widest text-[#c5a059] hover:underline font-semibold cursor-pointer"
       >
         Marcar outro agendamento
       </button>
@@ -557,7 +530,6 @@ export default function OnlineBooking() {
           transition={{ duration: 0.2 }}
           className="w-full flex justify-center"
         >
-          {stage === STAGES.PROCEDURE && renderProcedureStage()}
           {stage === STAGES.DATETIME && renderDateTimeStage()}
           {stage === STAGES.FORM && renderFormStage()}
           {stage === STAGES.SUCCESS && renderSuccessStage()}
