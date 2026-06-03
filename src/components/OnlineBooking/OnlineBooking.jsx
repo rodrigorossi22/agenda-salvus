@@ -93,6 +93,7 @@ export default function OnlineBooking() {
     
     let morning = []
     let afternoon = []
+    let evening = []
     let foundLocalId = null
 
     // Helper to add 30 minutes to an HH:MM:SS time string
@@ -122,8 +123,10 @@ export default function OnlineBooking() {
         validSlots.forEach(time => {
           if (time < '12:00:00') {
             morning.push(time)
-          } else {
+          } else if (time >= '12:00:00' && time < '18:00:00') {
             afternoon.push(time)
+          } else {
+            evening.push(time)
           }
         })
         break; // Stop at first local that has slots for this date
@@ -132,14 +135,17 @@ export default function OnlineBooking() {
 
     morning.sort()
     afternoon.sort()
+    evening.sort()
 
     // Apply scarcity rule: Max 3 per period
     const limitedMorning = morning.slice(0, 3)
     const limitedAfternoon = afternoon.slice(0, 3)
+    const limitedEvening = evening.slice(0, 3)
 
     return {
       morning: limitedMorning,
       afternoon: limitedAfternoon,
+      evening: limitedEvening,
       localId: foundLocalId
     }
   }, [selectedDate, availableSlots])
@@ -370,6 +376,26 @@ export default function OnlineBooking() {
                 ) : (
                   <div className="grid grid-cols-3 gap-3">
                     {scarcitySlotsForDate.afternoon.map(time => (
+                      <button
+                        key={time}
+                        onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
+                        className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
+                      >
+                        {time.substring(0, 5)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Evening section */}
+              <div>
+                <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Noite</h4>
+                {scarcitySlotsForDate.evening.length === 0 ? (
+                  <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da noite.</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {scarcitySlotsForDate.evening.map(time => (
                       <button
                         key={time}
                         onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
