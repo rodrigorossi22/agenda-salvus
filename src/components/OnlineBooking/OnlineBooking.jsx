@@ -218,16 +218,24 @@ export default function OnlineBooking() {
       return `${pad(newH)}:${pad(newM)}:${pad(s)}`
     }
 
+    const isHeadSpa = selectedProcedure?.id === 'head-spa'
+
     for (const localId of Object.keys(availableSlots)) {
       const dateSlots = availableSlots[localId]?.[dateKey] || []
       if (dateSlots.length > 0) {
         foundLocalId = localId
 
         // Filter: Keep slot only if:
-        // 1. It starts before 20:00:00 (since Monica stops serving at 20:30, the last 60-min slot starts at 19:30)
+        // 1. It fits the professional's hours (Monica starts before 20:00, Raquel between 14:00 and 16:00)
         // 2. The subsequent 30-min block is also available (requires 60 min total)
         const validSlots = dateSlots.filter(time => {
-          if (time >= '20:00:00') return false
+          if (isHeadSpa) {
+            // Raquel rules: strictly between 14h and 17h, last slot starts at 16h
+            if (time < '14:00:00' || time > '16:00:00') return false
+          } else {
+            // Monica rules: starts before 20h
+            if (time >= '20:00:00') return false
+          }
           const nextTime = add30Minutes(time)
           return dateSlots.includes(nextTime)
         })
@@ -262,7 +270,7 @@ export default function OnlineBooking() {
       evening: limitedEvening,
       localId: foundLocalId
     }
-  }, [selectedDate, availableSlots])
+  }, [selectedDate, availableSlots, selectedProcedure])
 
   const handleProcedureSelect = (proc) => {
     setSelectedProcedure(proc)
@@ -421,23 +429,33 @@ export default function OnlineBooking() {
   const weekdays = useMemo(() => {
     const list = []
     let current = new Date()
+    const isHeadSpa = selectedProcedure?.id === 'head-spa'
+    
     while (list.length < 14) {
-      const dayOfWeek = current.getDay() // 0 = Sunday, 6 = Saturday
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        list.push(new Date(current))
+      const dayOfWeek = current.getDay() // 0 = Sunday, 1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday
+      
+      if (isHeadSpa) {
+        // Raquel: Only Mondays (1), Tuesdays (2), Wednesdays (3)
+        if (dayOfWeek === 1 || dayOfWeek === 2 || dayOfWeek === 3) {
+          list.push(new Date(current))
+        }
+      } else {
+        // Monica: Mon to Fri (exclude Sat/Sun)
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          list.push(new Date(current))
+        }
       }
       current = addDays(current, 1)
     }
     return list
-  }, [])
+  }, [selectedProcedure])
 
-  // Auto-reset selected date to first weekday if today is weekend
+  // Auto-reset selected date to the first available day if it's not in the weekdays list
   useEffect(() => {
     if (weekdays.length > 0) {
-      const todayKey = format(new Date(), 'yyyy-MM-dd')
       const selectedKey = format(selectedDate, 'yyyy-MM-dd')
-      const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6
-      if (isWeekend && todayKey === selectedKey) {
+      const isSelectedDayAvailable = weekdays.some(day => format(day, 'yyyy-MM-dd') === selectedKey)
+      if (!isSelectedDayAvailable) {
         setSelectedDate(weekdays[0])
       }
     }
