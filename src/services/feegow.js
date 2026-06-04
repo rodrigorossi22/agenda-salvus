@@ -104,9 +104,13 @@ export async function searchPatient({ cpf, telefone }) {
   const params = new URLSearchParams()
   params.set('limit', '50')
   params.set('offset', '0')
-
   const cleanCpf = cpf ? cpf.replace(/\D/g, '') : ''
-  const cleanTelefone = telefone ? telefone.replace(/\D/g, '') : ''
+  let cleanTelefone = telefone ? telefone.replace(/\D/g, '') : ''
+
+  // Normaliza telefone caso inicie com +55 (12 ou 13 dígitos numéricos)
+  if (cleanTelefone.startsWith('55') && (cleanTelefone.length === 12 || cleanTelefone.length === 13)) {
+    cleanTelefone = cleanTelefone.substring(2)
+  }
 
   if (cleanCpf.length > 0) {
     params.set('cpf', cleanCpf)
@@ -119,30 +123,34 @@ export async function searchPatient({ cpf, telefone }) {
   const data = await request(`/patient/list?${params}`)
   const list = data.content || []
   if (list.length > 0 && list[0].patient_id) {
-    return list[0].patient_id
+    return {
+      patient_id: list[0].patient_id,
+      nome: list[0].nome || ''
+    }
   }
   return null
 }
 
-export async function createPatient({ nome_completo, celular, cpf, origem_id = 20 }) {
+export async function createPatient({ nome_completo, celular, cpf, email, nascimento, origem_id = 20 }) {
   const payload = {
     nome_completo,
     celular1: celular.replace(/\D/g, ''),
     origem_id: Number(origem_id),
+    email,
+    nascimento
   }
-
+  // Mantém o tratamento de CPF limpo e sem_cpf
   const cleanCpf = cpf ? cpf.replace(/\D/g, '') : ''
   if (cleanCpf.length > 0) {
     payload.cpf = cleanCpf
   } else {
     payload.sem_cpf = true
   }
-
+  // Faz a chamada de request
   const data = await request('/patient/create', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
-
   return data.content?.paciente_id || null
 }
 

@@ -71,10 +71,10 @@ describe('updateAppointmentStatus', () => {
 })
 
 describe('searchPatient', () => {
-  it('calls GET /patient/list with cpf and returns patient_id', async () => {
+  it('calls GET /patient/list with cpf and returns patient_id and name', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ content: [{ patient_id: 12345 }], success: true }),
+      json: async () => ({ content: [{ patient_id: 12345, nome: 'John Doe' }], success: true }),
     })
     const result = await searchPatient({ cpf: '11122233344', telefone: '21988888888' })
     expect(mockFetch).toHaveBeenCalledWith(
@@ -82,13 +82,13 @@ describe('searchPatient', () => {
       expect.any(Object)
     )
     expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining('telefone='), expect.any(Object))
-    expect(result).toBe(12345)
+    expect(result).toEqual({ patient_id: 12345, nome: 'John Doe' })
   })
 
   it('calls GET /patient/list with phone if CPF is missing', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ content: [{ patient_id: 54321 }], success: true }),
+      json: async () => ({ content: [{ patient_id: 54321, nome: 'John Doe' }], success: true }),
     })
     const result = await searchPatient({ cpf: '', telefone: '21988888888' })
     expect(mockFetch).toHaveBeenCalledWith(
@@ -96,7 +96,7 @@ describe('searchPatient', () => {
       expect.any(Object)
     )
     expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining('cpf='), expect.any(Object))
-    expect(result).toBe(54321)
+    expect(result).toEqual({ patient_id: 54321, nome: 'John Doe' })
   })
 
   it('returns null if no patient found', async () => {
@@ -106,6 +106,18 @@ describe('searchPatient', () => {
     })
     const result = await searchPatient({ telefone: '21988888888' })
     expect(result).toBeNull()
+  })
+
+  it('normalizes phone number starting with 55', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ content: [{ patient_id: 12345, nome: 'John Doe' }], success: true }),
+    })
+    await searchPatient({ cpf: '', telefone: '+5521988888888' })
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/patient/list?limit=50&offset=0&telefone=21988888888'),
+      expect.any(Object)
+    )
   })
 })
 
@@ -128,6 +140,33 @@ describe('createPatient', () => {
     expect(body.nome_completo).toBe('Maria Souza')
     expect(body.celular1).toBe('21977777777')
     expect(body.sem_cpf).toBe(true)
+    expect(body.origem_id).toBe(20)
+    expect(result).toBe(6789)
+  })
+
+  it('POSTs patient data with email and nascimento and returns paciente_id', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ content: { paciente_id: 6789 }, success: true }),
+    })
+    const result = await createPatient({
+      nome_completo: 'Maria Souza',
+      celular: '21977777777',
+      cpf: '111.222.333-44',
+      email: 'maria.souza@example.com',
+      nascimento: '1995-10-15',
+      origem_id: 20
+    })
+    
+    const [, options] = mockFetch.mock.calls[0]
+    const body = JSON.parse(options.body)
+    
+    expect(options.method).toBe('POST')
+    expect(body.nome_completo).toBe('Maria Souza')
+    expect(body.celular1).toBe('21977777777')
+    expect(body.cpf).toBe('11122233344')
+    expect(body.email).toBe('maria.souza@example.com')
+    expect(body.nascimento).toBe('1995-10-15')
     expect(body.origem_id).toBe(20)
     expect(result).toBe(6789)
   })
