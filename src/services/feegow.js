@@ -12,7 +12,31 @@ function getHeaders() {
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, { headers: getHeaders(), ...options })
-  if (!res.ok) throw new Error(`Erro na conexão HTTP: ${res.status}`)
+  
+  if (!res.ok) {
+    let errorMsg = `Erro na conexão HTTP: ${res.status}`;
+    try {
+      const errorData = await res.json();
+      if (errorData && typeof errorData === 'object') {
+        const detailParts = [];
+        for (const [key, messages] of Object.entries(errorData)) {
+          if (Array.isArray(messages)) {
+            detailParts.push(`${key}: ${messages.join(', ')}`);
+          } else if (typeof messages === 'string') {
+            detailParts.push(`${key}: ${messages}`);
+          }
+        }
+        if (detailParts.length > 0) {
+          errorMsg = `Feegow diz: ${detailParts.join(' | ')}`;
+        } else if (errorData.error || errorData.message) {
+          errorMsg = `Feegow diz: ${errorData.error || errorData.message}`;
+        }
+      }
+    } catch (_) {
+      // Ignora erro de JSON e mantém o HTTP status original
+    }
+    throw new Error(errorMsg);
+  }
 
   const data = await res.json()
 

@@ -218,3 +218,28 @@ describe('fetchAvailableSchedule', () => {
   })
 })
 
+describe('Feegow error handling', () => {
+  it('throws detailed error messages on 422 responses', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      json: async () => ({ cpf: ['O cpf informado é invalido.'], email: ['O campo email é inválido.'] }),
+    })
+    
+    await expect(searchPatient({ cpf: '12345678900' })).rejects.toThrow(
+      'Feegow diz: cpf: O cpf informado é invalido. | email: O campo email é inválido.'
+    )
+  })
+
+  it('throws HTTP error message if response is not ok and JSON parsing fails', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => { throw new Error('Bad JSON') },
+    })
+    
+    await expect(searchPatient({ cpf: '12345678900' })).rejects.toThrow('Erro na conexão HTTP: 500')
+  })
+})
+
+
