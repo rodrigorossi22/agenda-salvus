@@ -138,8 +138,9 @@ export default function OnlineBooking() {
     try {
       const todayStr = format(new Date(), 'dd-MM-yyyy')
       const futureStr = format(addDays(new Date(), 30), 'dd-MM-yyyy')
+      const targetProcId = isTestMode ? 338 : (selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id)
       const data = await fetchAvailableSchedule({
-        procedimento_id: selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id,
+        procedimento_id: targetProcId,
         data_start: todayStr,
         data_end: futureStr,
         profissional_id: activeProfessionalId
@@ -154,7 +155,7 @@ export default function OnlineBooking() {
     } finally {
       setLoadingSlots(false)
     }
-  }, [activeProfessionalId, selectedProcedure])
+  }, [activeProfessionalId, selectedProcedure, isTestMode])
 
   // Load available slots when active professional or selected procedure changes, or stage changes to DATETIME
   useEffect(() => {
@@ -288,7 +289,7 @@ export default function OnlineBooking() {
       setAppointmentDetails({
         procedureName: selectedProcedure?.name || DEFAULT_PROCEDURE.name,
         date: format(selectedDate, 'dd/MM/yyyy'),
-        time: selectedTime.substring(0, 5)
+        time: selectedTime?.substring(0, 5) || ''
       })
 
       setStage(STAGES.SUCCESS)
@@ -436,12 +437,12 @@ export default function OnlineBooking() {
         </header>
 
         {/* Test Mode Notification Banners */}
-        {((activeProfessionalId === '15' || activeProfessionalId === '16') && !hasSlots && !loadingSlots) && (
+        {(!isTestMode && !hasSlots && !loadingSlots && selectedProcedure) && (
           <div className="mb-6 p-4 rounded-lg bg-[#faf0e6] border border-[#e6d0ba] text-[#8c6d53] text-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div>
               <p className="font-semibold">⚠️ Sem horários cadastrados</p>
               <p className="text-xs mt-1 text-[#9e826c]">
-                A profissional {selectedProcedure?.professionalName || 'Monica Sousa'} (ID {activeProfessionalId}) não possui horários ativos no Feegow. 
+                A profissional {selectedProcedure?.professionalName || 'Monica Sousa'} (ID {selectedProcedure?.professionalId}) não possui horários ativos no Feegow. 
                 Para testar o fluxo de agendamento localmente, clique no botão ao lado para carregar a agenda de teste (Dr. Deangelo ID 1).
               </p>
             </div>
@@ -603,7 +604,7 @@ export default function OnlineBooking() {
         <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Você selecionou</span>
         <h2 className="text-xl font-serif mt-1 text-[#2e2a25]">{selectedProcedure?.name || 'Atendimento Estético'}</h2>
         <p className="text-sm text-[#7a7065] mt-1">
-          Dia {format(selectedDate, 'dd/MM/yyyy')} às {selectedTime.substring(0, 5)} com {selectedProcedure?.professionalName || 'Monica Sousa'} {isTestMode && '(Agenda Teste)'}
+          Dia {format(selectedDate, 'dd/MM/yyyy')} às {selectedTime?.substring(0, 5) || ''} com {selectedProcedure?.professionalName || 'Monica Sousa'} {isTestMode && '(Agenda Teste)'}
         </p>
       </header>
 
