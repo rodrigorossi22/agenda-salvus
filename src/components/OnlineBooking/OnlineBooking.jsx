@@ -85,6 +85,7 @@ export default function OnlineBooking() {
   const [foundPatientName, setFoundPatientName] = useState('')
   const [foundPatientId, setFoundPatientId] = useState(null)
   const [searchingPatient, setSearchingPatient] = useState(false)
+  const [searchFailed, setSearchFailed] = useState(false)
 
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedTime, setSelectedTime] = useState(null)
@@ -103,6 +104,37 @@ export default function OnlineBooking() {
 
   // Custom active professional derived from test mode or selected procedure
   const activeProfessionalId = isTestMode ? '1' : (selectedProcedure?.professionalId || '15')
+
+  const handlePhoneChange = (e) => {
+    setPhone(e.target.value)
+    setFoundPatientId(null)
+    setFoundPatientName('')
+    setSearchFailed(false)
+  }
+
+  const handleSearchPatient = async () => {
+    if (!phone.trim()) {
+      setErrorMessage('Por favor, preencha o campo de celular.')
+      return
+    }
+    setSearchingPatient(true)
+    setErrorMessage(null)
+    setSearchFailed(false)
+    try {
+      const result = await searchPatient({ telefone: phone })
+      if (result && result.patient_id) {
+        setFoundPatientId(result.patient_id)
+        setFoundPatientName(result.nome)
+      } else {
+        setSearchFailed(true)
+      }
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Erro ao buscar cadastro. Tente novamente.')
+    } finally {
+      setSearchingPatient(false)
+    }
+  }
 
   // Parse tracking parameters (UTMs)
   const queryParams = useMemo(() => new URLSearchParams(window.location.search), [])
@@ -245,65 +277,143 @@ export default function OnlineBooking() {
 
   const handleBooking = async (e) => {
     e.preventDefault()
-    if (!name.trim() || !phone.trim()) {
-      setErrorMessage('Por favor, preencha o Nome e o Celular.')
-      return
-    }
 
-    setSubmitting(true)
-    setErrorMessage(null)
+    if (isFirstTime) {
+      if (!name.trim() || !phone.trim() || !cpf.trim() || !birthDate.trim() || !email.trim()) {
+        setErrorMessage('Por favor, preencha todos os campos obrigatórios (Nome, Celular, CPF, Data de Nascimento e E-mail).')
+        return
+      }
 
-    try {
-      // Step 1: Search patient
-      let patientId = await searchPatient({ cpf, telefone: phone })
-      
-      // Step 2: Create if not found
-      if (!patientId) {
+      // Validar se o CPF tem exatamente 11 dígitos numéricos limpos
+      const cleanCpf = cpf.replace(/\D/g, '')
+      if (cleanCpf.length !== 11) {
+        setErrorMessage('O CPF deve conter exatamente 11 dígitos.')
+        return
+      }
+
+      // Validar se a data de nascimento tem o formato DD/MM/AAAA usando regex /^\d{2}\/\d{2}\/\d{4}$/
+      if (!/^\d{2}\/\d{2}\/\d{4}$/.test(birthDate)) {
+        setErrorMessage('A data de nascimento deve estar no formato DD/MM/AAAA.')
+        return
+      }
+
+      setSubmitting(true)
+      setErrorMessage(null)
+
+      try {
+        // Implementar verificação de duplicidade na submissão: chamar searchPatient({ cpf })
+        const existingPatient = await searchPatient({ cpf: cleanCpf })
+        if (existingPatient) {
+          setErrorMessage('Já existe um cadastro com este CPF. Por favor, use a aba "Já sou paciente".')
+          setSubmitting(false)
+          return
+        }
+
+        // Formatar a Data de Nascimento para o formato da API (YYYY-MM-DD)
+        const parts = birthDate.split('/')
+        const formattedBirthDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+
         const originId = getOrigemId()
-        patientId = await createPatient({
+        
+        // Criar paciente
+        const newPatientId = await createPatient({
           nome_completo: name,
           celular: phone,
-          cpf,
+          cpf: cleanCpf,
+          email,
+          nascimento: formattedBirthDate,
           origem_id: originId
         })
+
+        if (!newPatientId) {
+          throw new Error('Falha ao registrar paciente na Feegow.')
+        }
+
+        // Formatar data da consulta (dd-MM-yyyy para Feegow)
+        const formattedDate = format(selectedDate, 'dd-MM-yyyy')
+
+        const targetProcId = isTestMode ? 338 : selectedProcedure?.feegowId
+        const targetProfId = isTestMode ? 1 : selectedProcedure?.professionalId
+        const professionalName = isTestMode ? 'Teste' : (selectedProcedure?.professionalName || 'Monica Sousa')
+
+        // Criar Agendamento
+        await createAppointment({
+          local_id: selectedLocalId || scarcitySlotsForDate.localId,
+          paciente_id: newPatientId,
+          procedimento_id: targetProcId,
+          data: formattedDate,
+          horario: selectedTime,
+          notas: `Agendamento automático via link online (${isTestMode ? 'Teste' : selectedProcedure?.professionalName}). Origem/UTM: ID ${getOrigemId()}.`,
+          profissional_id: targetProfId
+        })
+
+        setAppointmentDetails({
+          procedureName: selectedProcedure?.name || DEFAULT_PROCEDURE.name,
+          date: format(selectedDate, 'dd/MM/yyyy'),
+          time: selectedTime?.substring(0, 5) || ''
+        })
+
+        setStage(STAGES.SUCCESS)
+      } catch (err) {
+        console.error(err)
+        setErrorMessage(
+          err.message?.includes('Feegow')
+            ? err.message
+            : 'Este horário foi preenchido recentemente por outro paciente. Por favor, selecione outra vaga.'
+        )
+        loadSlots()
+      } finally {
+        setSubmitting(false)
       }
 
-      if (!patientId) {
-        throw new Error('Falha ao registrar ou buscar paciente na Feegow.')
+    } else {
+      // Já sou paciente
+      if (!phone.trim()) {
+        setErrorMessage('Por favor, preencha o celular.')
+        return
       }
 
-      // Step 3: Format selectedDate from YYYY-MM-DD back to dd-mm-YYYY
-      const formattedDate = format(selectedDate, 'dd-MM-yyyy')
+      if (!foundPatientId) {
+        setErrorMessage('Por favor, busque seu cadastro antes de confirmar.')
+        return
+      }
 
-      // Step 4: Create Appointment
-      await createAppointment({
-        local_id: selectedLocalId || scarcitySlotsForDate.localId,
-        paciente_id: patientId,
-        procedimento_id: selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id,
-        data: formattedDate,
-        horario: selectedTime,
-        notas: `Agendamento automático via link online (${selectedProcedure?.professionalName || 'Monica Sousa'}). Origem/UTM: ID ${getOrigemId()}.`,
-        profissional_id: activeProfessionalId
-      })
+      setSubmitting(true)
+      setErrorMessage(null)
 
-      setAppointmentDetails({
-        procedureName: selectedProcedure?.name || DEFAULT_PROCEDURE.name,
-        date: format(selectedDate, 'dd/MM/yyyy'),
-        time: selectedTime?.substring(0, 5) || ''
-      })
+      try {
+        const formattedDate = format(selectedDate, 'dd-MM-yyyy')
+        const targetProcId = isTestMode ? 338 : selectedProcedure?.feegowId
+        const targetProfId = isTestMode ? 1 : selectedProcedure?.professionalId
 
-      setStage(STAGES.SUCCESS)
-    } catch (err) {
-      console.error(err)
-      setErrorMessage(
-        err.message?.includes('Feegow')
-          ? err.message
-          : 'Este horário foi preenchido recentemente por outro paciente. Por favor, selecione outra vaga.'
-      )
-      // Reload slots to get the updated available slots after error
-      loadSlots()
-    } finally {
-      setSubmitting(false)
+        await createAppointment({
+          local_id: selectedLocalId || scarcitySlotsForDate.localId,
+          paciente_id: foundPatientId,
+          procedimento_id: targetProcId,
+          data: formattedDate,
+          horario: selectedTime,
+          notas: `Agendamento automático via link online (${isTestMode ? 'Teste' : selectedProcedure?.professionalName}). Origem/UTM: ID ${getOrigemId()}.`,
+          profissional_id: targetProfId
+        })
+
+        setAppointmentDetails({
+          procedureName: selectedProcedure?.name || DEFAULT_PROCEDURE.name,
+          date: format(selectedDate, 'dd/MM/yyyy'),
+          time: selectedTime?.substring(0, 5) || ''
+        })
+
+        setStage(STAGES.SUCCESS)
+      } catch (err) {
+        console.error(err)
+        setErrorMessage(
+          err.message?.includes('Feegow')
+            ? err.message
+            : 'Este horário foi preenchido recentemente por outro paciente. Por favor, selecione outra vaga.'
+        )
+        loadSlots()
+      } finally {
+        setSubmitting(false)
+      }
     }
   }
 
@@ -591,84 +701,222 @@ export default function OnlineBooking() {
     )
   }
 
-  const renderFormStage = () => (
-    <div className="w-full max-w-md px-4">
-      <button 
-        onClick={() => setStage(STAGES.DATETIME)}
-        className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-6 transition-colors cursor-pointer"
-      >
-        ← Voltar para Horários
-      </button>
-
-      <header className="mb-8 border-b border-[#e6e2dc] pb-4">
-        <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Você selecionou</span>
-        <h2 className="text-xl font-serif mt-1 text-[#2e2a25]">{selectedProcedure?.name || 'Atendimento Estético'}</h2>
-        <p className="text-sm text-[#7a7065] mt-1">
-          Dia {format(selectedDate, 'dd/MM/yyyy')} às {selectedTime?.substring(0, 5) || ''} com {selectedProcedure?.professionalName || 'Monica Sousa'} {isTestMode && '(Agenda Teste)'}
-        </p>
-      </header>
-
-      {errorMessage && (
-        <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm leading-relaxed">
-          {errorMessage}
-        </div>
-      )}
-
-      <form onSubmit={handleBooking} className="space-y-6">
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">Nome Completo *</label>
-          <input 
-            type="text" 
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Digite seu nome completo"
-            required
-            className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">WhatsApp / Celular *</label>
-          <input 
-            type="tel" 
-            value={phone}
-            onChange={e => setPhone(e.target.value)}
-            placeholder="(DD) 99999-9999"
-            required
-            className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">
-            CPF <span className="text-[10px] text-[#a29382] font-normal">(Opcional - ajuda a validar seu cadastro)</span>
-          </label>
-          <input 
-            type="text" 
-            value={cpf}
-            onChange={e => setCpf(e.target.value)}
-            placeholder="000.000.000-00"
-            className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
-          />
-        </div>
-
+  const renderFormStage = () => {
+    return (
+      <div className="w-full max-w-md px-4">
         <button 
-          type="submit"
-          disabled={submitting}
-          className="w-full bg-[#c5a059] disabled:bg-[#c5a059]/50 hover:bg-[#b08e4f] text-white font-bold py-4 rounded-lg uppercase tracking-widest text-xs transition-colors flex items-center justify-center shadow-md cursor-pointer"
+          onClick={() => setStage(STAGES.DATETIME)}
+          className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-6 transition-colors cursor-pointer"
         >
-          {submitting ? (
+          ← Voltar para Horários
+        </button>
+
+        <header className="mb-8 border-b border-[#e6e2dc] pb-4">
+          <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Você selecionou</span>
+          <h2 className="text-xl font-serif mt-1 text-[#2e2a25]">{selectedProcedure?.name || 'Atendimento Estético'}</h2>
+          <p className="text-sm text-[#7a7065] mt-1">
+            Dia {format(selectedDate, 'dd/MM/yyyy')} às {selectedTime?.substring(0, 5) || ''} com {isTestMode ? 'Médico de Teste' : selectedProcedure?.professionalName} {isTestMode && '(Agenda Teste)'}
+          </p>
+        </header>
+
+        {/* Abas */}
+        <div className="flex border-b border-[#e6e2dc] mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              setIsFirstTime(true)
+              setFoundPatientId(null)
+              setFoundPatientName('')
+              setSearchFailed(false)
+              setErrorMessage(null)
+            }}
+            className={`flex-1 text-center py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 border-b-2 cursor-pointer ${
+              isFirstTime
+                ? 'border-[#c5a059] text-[#c5a059]'
+                : 'border-transparent text-[#7a7065] hover:text-[#2e2a25]'
+            }`}
+          >
+            Primeira Vez
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsFirstTime(false)
+              setFoundPatientId(null)
+              setFoundPatientName('')
+              setSearchFailed(false)
+              setErrorMessage(null)
+            }}
+            className={`flex-1 text-center py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 border-b-2 cursor-pointer ${
+              !isFirstTime
+                ? 'border-[#c5a059] text-[#c5a059]'
+                : 'border-transparent text-[#7a7065] hover:text-[#2e2a25]'
+            }`}
+          >
+            Já sou paciente
+          </button>
+        </div>
+
+        {errorMessage && (
+          <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm leading-relaxed">
+            {errorMessage}
+          </div>
+        )}
+
+        <form onSubmit={handleBooking} className="space-y-6">
+          {isFirstTime ? (
+            /* Campos Primeira Vez */
             <>
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-              Confirmando na Feegow...
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">Nome Completo *</label>
+                <input 
+                  type="text" 
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="Digite seu nome completo"
+                  required
+                  className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">CPF *</label>
+                <input 
+                  type="text" 
+                  value={cpf}
+                  onChange={e => setCpf(e.target.value)}
+                  placeholder="Apenas números (11 dígitos)"
+                  required
+                  className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">Data de Nascimento *</label>
+                <input 
+                  type="text" 
+                  value={birthDate}
+                  onChange={e => setBirthDate(e.target.value)}
+                  placeholder="DD/MM/AAAA"
+                  required
+                  className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">E-mail *</label>
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="seu.email@exemplo.com"
+                  required
+                  className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">WhatsApp / Celular *</label>
+                <input 
+                  type="tel" 
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="(DD) 99999-9999"
+                  required
+                  className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
+                />
+              </div>
+
+              <button 
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-[#c5a059] disabled:bg-[#c5a059]/50 hover:bg-[#b08e4f] text-white font-bold py-4 rounded-lg uppercase tracking-widest text-xs transition-colors flex items-center justify-center shadow-md cursor-pointer"
+              >
+                {submitting ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                    Confirmando na Feegow...
+                  </>
+                ) : (
+                  'Confirmar Agendamento'
+                )}
+              </button>
             </>
           ) : (
-            'Confirmar Agendamento'
+            /* Campos Já sou paciente */
+            <>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">WhatsApp / Celular *</label>
+                <input 
+                  type="tel" 
+                  value={phone}
+                  onChange={handlePhoneChange}
+                  placeholder="(DD) 99999-9999"
+                  required
+                  className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
+                />
+              </div>
+
+              {searchFailed && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm leading-relaxed">
+                    Não encontramos nenhum cadastro com este celular. Por favor, entre em contato pelo WhatsApp para atualizar seus dados.
+                  </div>
+                  <a 
+                    href={import.meta.env.VITE_CLINIC_WHATSAPP || 'https://wa.me/5511999999999'} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="mt-4 inline-flex items-center justify-center w-full bg-[#25d366] hover:bg-[#20ba5a] text-white font-bold py-3 rounded-lg uppercase tracking-wider text-xs transition-colors shadow-md text-center"
+                  >
+                    Falar no WhatsApp
+                  </a>
+                </div>
+              )}
+
+              {foundPatientId ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-[#7a7065] font-medium bg-[#fcf9f2] border border-[#e6e2dc] p-4 rounded-lg">
+                    Olá, <strong className="text-[#2e2a25]">{foundPatientName}</strong>! Encontramos seu cadastro. Deseja confirmar seu agendamento?
+                  </p>
+                  <button 
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full bg-[#c5a059] disabled:bg-[#c5a059]/50 hover:bg-[#b08e4f] text-white font-bold py-4 rounded-lg uppercase tracking-widest text-xs transition-colors flex items-center justify-center shadow-md cursor-pointer"
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                        Confirmando na Feegow...
+                      </>
+                    ) : (
+                      'Confirmar Agendamento'
+                    )}
+                  </button>
+                </div>
+              ) : (
+                !searchingPatient && (
+                  <button 
+                    type="button"
+                    onClick={handleSearchPatient}
+                    className="w-full bg-[#c5a059] hover:bg-[#b08e4f] text-white font-bold py-4 rounded-lg uppercase tracking-widest text-xs transition-colors flex items-center justify-center shadow-md cursor-pointer"
+                  >
+                    Buscar Cadastro
+                  </button>
+                )
+              )}
+
+              {searchingPatient && (
+                <div className="flex justify-center items-center py-4 text-sm text-[#7a7065]">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#c5a059] border-t-transparent mr-2" />
+                  Buscando cadastro...
+                </div>
+              )}
+            </>
           )}
-        </button>
-      </form>
-    </div>
-  )
+        </form>
+      </div>
+    )
+  }
 
   const renderSuccessStage = () => (
     <div className="w-full max-w-md px-4 text-center">
@@ -679,13 +927,13 @@ export default function OnlineBooking() {
       </div>
       <h2 className="text-3xl font-serif text-[#2e2a25] mb-2">Agendamento Realizado!</h2>
       <p className="text-sm text-[#7a7065] mb-8 leading-relaxed">
-        Seu horário com {selectedProcedure?.professionalName || 'Monica Sousa'} foi registrado com sucesso na Feegow. Te esperamos!
+        Seu horário com {isTestMode ? 'Médico de Teste' : selectedProcedure?.professionalName} foi registrado com sucesso na Feegow. Te esperamos!
       </p>
 
       <div className="bg-[#faf9f6] border border-[#e6e2dc] rounded-xl p-6 text-left space-y-4 mb-8 shadow-sm">
         <div>
           <span className="text-[10px] uppercase font-semibold tracking-widest text-[#7a7065] block">Atendimento</span>
-          <span className="text-[#2e2a25] font-medium">{appointmentDetails?.procedureName || 'Atendimento Estético'}</span>
+          <span className="text-[#2e2a25] font-medium">{selectedProcedure?.name}</span>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -699,7 +947,7 @@ export default function OnlineBooking() {
         </div>
         <div>
           <span className="text-[10px] uppercase font-semibold tracking-widest text-[#7a7065] block">Profissional</span>
-          <span className="text-[#2e2a25] font-medium">{selectedProcedure?.professionalName || 'Monica Sousa'}</span>
+          <span className="text-[#2e2a25] font-medium">{isTestMode ? 'Médico de Teste' : selectedProcedure?.professionalName}</span>
         </div>
       </div>
 
@@ -710,6 +958,11 @@ export default function OnlineBooking() {
           setName('')
           setPhone('')
           setCpf('')
+          setEmail('')
+          setBirthDate('')
+          setFoundPatientId(null)
+          setFoundPatientName('')
+          setSearchFailed(false)
           setStage(STAGES.PROCEDURE)
         }}
         className="text-xs uppercase tracking-widest text-[#c5a059] hover:underline font-semibold cursor-pointer"
