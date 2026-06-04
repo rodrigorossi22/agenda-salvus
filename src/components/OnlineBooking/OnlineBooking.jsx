@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useMemo } from 'react'
 import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -12,21 +13,84 @@ const DEFAULT_PROCEDURE = {
 }
 
 const STAGES = {
+  PROCEDURE: 'PROCEDURE',
   DATETIME: 'DATETIME',
   FORM: 'FORM',
   SUCCESS: 'SUCCESS'
 }
 
+const PROCEDURES = [
+  {
+    id: 'ventosaterapia',
+    name: 'Ventosaterapia',
+    description: 'Sucção contra dor e inflamação.',
+    category: 'Recuperação',
+    feegowId: 346,
+    professionalId: '15', // Monica
+    professionalName: 'Monica Sousa'
+  },
+  {
+    id: 'eletroestimulacao',
+    name: 'Eletroestimulação',
+    description: 'Estímlos para regeneração muscular.',
+    category: 'Recuperação',
+    feegowId: 347,
+    professionalId: '15', // Monica
+    professionalName: 'Monica Sousa'
+  },
+  {
+    id: 'shape-detox',
+    name: 'Shape Detox',
+    description: 'Protocolo para eliminar toxinas.',
+    category: 'Desintoxicação',
+    feegowId: 338,
+    professionalId: '15', // Monica
+    professionalName: 'Monica Sousa'
+  },
+  {
+    id: 'drenagem-linfatica',
+    name: 'Drenagem Linfática',
+    description: 'Redução de inchaço e retenção.',
+    category: 'Desintoxicação',
+    feegowId: 343,
+    professionalId: '15', // Monica
+    professionalName: 'Monica Sousa'
+  },
+  {
+    id: 'head-spa',
+    name: 'Head Spa',
+    description: 'Terapia capilar relaxante.',
+    category: 'Reset Mental',
+    feegowId: 348,
+    professionalId: '16', // Raquel
+    professionalName: 'Raquel Nina'
+  },
+  {
+    id: 'massagem-relaxante',
+    name: 'Massagem Relaxante',
+    description: 'Alívio de estresse e tensões.',
+    category: 'Reset Mental',
+    feegowId: 349,
+    professionalId: '15', // Monica
+    professionalName: 'Monica Sousa'
+  }
+]
+
 export default function OnlineBooking() {
-  const [stage, setStage] = useState(STAGES.DATETIME)
+  const [stage, setStage] = useState(STAGES.PROCEDURE)
+  const [selectedProcedure, setSelectedProcedure] = useState(null)
+  const [isFirstTime, setIsFirstTime] = useState(true)
+  const [email, setEmail] = useState('')
+  const [birthDate, setBirthDate] = useState('')
+  const [foundPatientName, setFoundPatientName] = useState('')
+  const [foundPatientId, setFoundPatientId] = useState(null)
+  const [searchingPatient, setSearchingPatient] = useState(false)
+
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedTime, setSelectedTime] = useState(null)
   const [selectedLocalId, setSelectedLocalId] = useState(null)
   const [availableSlots, setAvailableSlots] = useState({})
   const [loadingSlots, setLoadingSlots] = useState(false)
-  
-  // Custom active professional for testing purposes
-  const [activeProfessionalId, setActiveProfessionalId] = useState('15')
   const [isTestMode, setIsTestMode] = useState(false)
 
   // Form fields
@@ -37,8 +101,18 @@ export default function OnlineBooking() {
   const [errorMessage, setErrorMessage] = useState(null)
   const [appointmentDetails, setAppointmentDetails] = useState(null)
 
+  // Custom active professional derived from test mode or selected procedure
+  const activeProfessionalId = isTestMode ? '1' : (selectedProcedure?.professionalId || '15')
+
   // Parse tracking parameters (UTMs)
   const queryParams = useMemo(() => new URLSearchParams(window.location.search), [])
+
+  // Automatically detect test mode from URL query parameters
+  useEffect(() => {
+    if (queryParams.get('test_mode') === 'true') {
+      setIsTestMode(true)
+    }
+  }, [queryParams])
   
   const getOrigemId = () => {
     const utmSource = (queryParams.get('utm_source') || '').toLowerCase()
@@ -274,7 +348,6 @@ export default function OnlineBooking() {
             </div>
             <button
               onClick={() => {
-                setActiveProfessionalId('1')
                 setIsTestMode(true)
               }}
               className="bg-[#c5a059] hover:bg-[#b08e4f] text-white text-xs font-semibold px-4 py-2 rounded transition-colors whitespace-nowrap shadow-sm cursor-pointer"
@@ -291,7 +364,6 @@ export default function OnlineBooking() {
             </span>
             <button 
               onClick={() => {
-                setActiveProfessionalId('15')
                 setIsTestMode(false)
               }}
               className="text-[#5c7a40] hover:underline font-bold ml-2 whitespace-nowrap cursor-pointer"
