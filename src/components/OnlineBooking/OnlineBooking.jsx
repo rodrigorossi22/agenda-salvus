@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -132,14 +132,14 @@ export default function OnlineBooking() {
   }
 
   // Load available slots function
-  const loadSlots = async () => {
+  const loadSlots = useCallback(async () => {
     setLoadingSlots(true)
     setErrorMessage(null)
     try {
       const todayStr = format(new Date(), 'dd-MM-yyyy')
       const futureStr = format(addDays(new Date(), 30), 'dd-MM-yyyy')
       const data = await fetchAvailableSchedule({
-        procedimento_id: DEFAULT_PROCEDURE.id,
+        procedimento_id: selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id,
         data_start: todayStr,
         data_end: futureStr,
         profissional_id: activeProfessionalId
@@ -154,12 +154,14 @@ export default function OnlineBooking() {
     } finally {
       setLoadingSlots(false)
     }
-  }
+  }, [activeProfessionalId, selectedProcedure])
 
-  // Load available slots when active professional changes or component mounts
+  // Load available slots when active professional or selected procedure changes, or stage changes to DATETIME
   useEffect(() => {
-    loadSlots()
-  }, [activeProfessionalId])
+    if (stage === STAGES.DATETIME && selectedProcedure) {
+      loadSlots()
+    }
+  }, [loadSlots, stage, selectedProcedure])
 
   // Filter slots based on the Date, apply 60-min minimum duration filter and Scarcity rules
   const scarcitySlotsForDate = useMemo(() => {
@@ -229,6 +231,11 @@ export default function OnlineBooking() {
     }
   }, [selectedDate, availableSlots])
 
+  const handleProcedureSelect = (proc) => {
+    setSelectedProcedure(proc)
+    setStage(STAGES.DATETIME)
+  }
+
   const handleTimeSelect = (time, localId) => {
     setSelectedTime(time)
     setSelectedLocalId(localId)
@@ -271,15 +278,15 @@ export default function OnlineBooking() {
       await createAppointment({
         local_id: selectedLocalId || scarcitySlotsForDate.localId,
         paciente_id: patientId,
-        procedimento_id: DEFAULT_PROCEDURE.id,
+        procedimento_id: selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id,
         data: formattedDate,
         horario: selectedTime,
-        notas: `Agendamento automático via link online (Mônica). Origem/UTM: ID ${getOrigemId()}.`,
+        notas: `Agendamento automático via link online (${selectedProcedure?.professionalName || 'Monica Sousa'}). Origem/UTM: ID ${getOrigemId()}.`,
         profissional_id: activeProfessionalId
       })
 
       setAppointmentDetails({
-        procedureName: DEFAULT_PROCEDURE.name,
+        procedureName: selectedProcedure?.name || DEFAULT_PROCEDURE.name,
         date: format(selectedDate, 'dd/MM/yyyy'),
         time: selectedTime.substring(0, 5)
       })
@@ -323,26 +330,118 @@ export default function OnlineBooking() {
         setSelectedDate(weekdays[0])
       }
     }
-  }, [weekdays])
+  }, [weekdays, selectedDate])
+
+  const renderProcedureStage = () => {
+    const categories = ['Recuperação', 'Desintoxicação', 'Reset Mental']
+
+    const getCategoryFooter = (category) => {
+      const categoryProcs = PROCEDURES.filter(p => p.category === category)
+      const uniqueProfs = [...new Set(categoryProcs.map(p => p.professionalName))]
+      return `${categoryProcs.length} procedimento${categoryProcs.length > 1 ? 's' : ''} • com ${uniqueProfs.join(', ')}`
+    }
+
+    return (
+      <div className="w-full max-w-6xl px-4">
+        <header className="mb-12 text-center">
+          <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Agendamento Online</span>
+          <h2 className="text-4xl font-serif mt-2 text-[#2e2a25]">Escolha o seu Atendimento</h2>
+          <p className="text-sm text-[#7a7065] mt-2">Selecione uma categoria e o procedimento desejado para continuar</p>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {categories.map((category) => {
+            const categoryProcs = PROCEDURES.filter((p) => p.category === category)
+
+            return (
+              <div 
+                key={category} 
+                className="bg-white border border-[#e6e2dc] rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow duration-300"
+              >
+                <div>
+                  <div className="border-b border-[#e6e2dc] pb-4 mb-6">
+                    <h3 className="text-xl font-serif text-[#2e2a25] font-medium">{category}</h3>
+                    <p className="text-[10px] text-[#a29382] tracking-wider uppercase mt-1">
+                      {category === 'Recuperação' && 'Alívio & Regeneração'}
+                      {category === 'Desintoxicação' && 'Purificação & Forma'}
+                      {category === 'Reset Mental' && 'Equilíbrio & Relaxamento'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 mb-6">
+                    {categoryProcs.map((proc) => (
+                      <button
+                        key={proc.id}
+                        onClick={() => handleProcedureSelect(proc)}
+                        className="w-full text-left bg-[#fdfbf7] hover:bg-[#c5a059]/5 border border-[#e6e2dc] hover:border-[#c5a059] rounded-xl p-4 transition-all duration-300 group cursor-pointer flex flex-col justify-between shadow-sm"
+                      >
+                        <div className="w-full">
+                          <div className="flex justify-between items-start gap-2">
+                            <h4 className="font-semibold text-sm text-[#2e2a25] group-hover:text-[#c5a059] transition-colors">
+                              {proc.name}
+                            </h4>
+                            <span className="text-[10px] bg-white border border-[#e6e2dc] text-[#7a7065] px-2 py-0.5 rounded-full whitespace-nowrap">
+                              60 min
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#7a7065] mt-1.5 leading-relaxed">
+                            {proc.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between w-full mt-4 pt-2.5 border-t border-[#f2efeb] text-[10px] text-[#a29382]">
+                          <span>Por: {proc.professionalName}</span>
+                          <span className="text-[#c5a059] font-semibold flex items-center gap-0.5">
+                            Selecionar
+                            <svg className="w-3 h-3 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-[#e6e2dc] pt-4 text-[11px] text-[#7a7065] font-serif italic text-center">
+                  {getCategoryFooter(category)}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
 
   const renderDateTimeStage = () => {
     const hasSlots = Object.keys(availableSlots).length > 0
 
     return (
       <div className="w-full max-w-3xl px-4">
+        <button 
+          onClick={() => {
+            setSelectedProcedure(null)
+            setSelectedTime(null)
+            setStage(STAGES.PROCEDURE)
+          }}
+          className="flex items-center text-sm text-[#7a7065] hover:text-[#c5a059] mb-6 transition-colors cursor-pointer"
+        >
+          ← Voltar para Procedimentos
+        </button>
+
         <header className="mb-8 text-center">
           <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Agendamento Online</span>
-          <h2 className="text-4xl font-serif mt-2 text-[#2e2a25]">Agenda Recovery e Bem-estar</h2>
-          <p className="text-sm text-[#7a7065] mt-2">Profissional: Monica Sousa</p>
+          <h2 className="text-4xl font-serif mt-2 text-[#2e2a25]">{selectedProcedure?.name || 'Agenda Recovery e Bem-estar'}</h2>
+          <p className="text-sm text-[#7a7065] mt-2">Profissional: {selectedProcedure?.professionalName || 'Monica Sousa'}</p>
         </header>
 
         {/* Test Mode Notification Banners */}
-        {activeProfessionalId === '15' && !hasSlots && !loadingSlots && (
+        {((activeProfessionalId === '15' || activeProfessionalId === '16') && !hasSlots && !loadingSlots) && (
           <div className="mb-6 p-4 rounded-lg bg-[#faf0e6] border border-[#e6d0ba] text-[#8c6d53] text-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div>
               <p className="font-semibold">⚠️ Sem horários cadastrados</p>
               <p className="text-xs mt-1 text-[#9e826c]">
-                A profissional Monica Sousa (ID 15) não possui horários ativos no Feegow. 
+                A profissional {selectedProcedure?.professionalName || 'Monica Sousa'} (ID {activeProfessionalId}) não possui horários ativos no Feegow. 
                 Para testar o fluxo de agendamento localmente, clique no botão ao lado para carregar a agenda de teste (Dr. Deangelo ID 1).
               </p>
             </div>
@@ -368,7 +467,7 @@ export default function OnlineBooking() {
               }}
               className="text-[#5c7a40] hover:underline font-bold ml-2 whitespace-nowrap cursor-pointer"
             >
-              Restaurar Monica (ID 15)
+              Restaurar {selectedProcedure?.professionalName || 'Monica Sousa'}
             </button>
           </div>
         )}
@@ -502,9 +601,9 @@ export default function OnlineBooking() {
 
       <header className="mb-8 border-b border-[#e6e2dc] pb-4">
         <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Você selecionou</span>
-        <h2 className="text-xl font-serif mt-1 text-[#2e2a25]">Atendimento Estético</h2>
+        <h2 className="text-xl font-serif mt-1 text-[#2e2a25]">{selectedProcedure?.name || 'Atendimento Estético'}</h2>
         <p className="text-sm text-[#7a7065] mt-1">
-          Dia {format(selectedDate, 'dd/MM/yyyy')} às {selectedTime.substring(0, 5)} com Monica Sousa {isTestMode && '(Agenda Teste)'}
+          Dia {format(selectedDate, 'dd/MM/yyyy')} às {selectedTime.substring(0, 5)} com {selectedProcedure?.professionalName || 'Monica Sousa'} {isTestMode && '(Agenda Teste)'}
         </p>
       </header>
 
@@ -579,13 +678,13 @@ export default function OnlineBooking() {
       </div>
       <h2 className="text-3xl font-serif text-[#2e2a25] mb-2">Agendamento Realizado!</h2>
       <p className="text-sm text-[#7a7065] mb-8 leading-relaxed">
-        Seu horário com Monica Sousa foi registrado com sucesso na Feegow. Te esperamos!
+        Seu horário com {selectedProcedure?.professionalName || 'Monica Sousa'} foi registrado com sucesso na Feegow. Te esperamos!
       </p>
 
       <div className="bg-[#faf9f6] border border-[#e6e2dc] rounded-xl p-6 text-left space-y-4 mb-8 shadow-sm">
         <div>
           <span className="text-[10px] uppercase font-semibold tracking-widest text-[#7a7065] block">Atendimento</span>
-          <span className="text-[#2e2a25] font-medium">Atendimento Estético</span>
+          <span className="text-[#2e2a25] font-medium">{appointmentDetails?.procedureName || 'Atendimento Estético'}</span>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -599,17 +698,18 @@ export default function OnlineBooking() {
         </div>
         <div>
           <span className="text-[10px] uppercase font-semibold tracking-widest text-[#7a7065] block">Profissional</span>
-          <span className="text-[#2e2a25] font-medium">Monica Sousa</span>
+          <span className="text-[#2e2a25] font-medium">{selectedProcedure?.professionalName || 'Monica Sousa'}</span>
         </div>
       </div>
 
       <button 
         onClick={() => {
+          setSelectedProcedure(null)
           setSelectedTime(null)
           setName('')
           setPhone('')
           setCpf('')
-          setStage(STAGES.DATETIME)
+          setStage(STAGES.PROCEDURE)
         }}
         className="text-xs uppercase tracking-widest text-[#c5a059] hover:underline font-semibold cursor-pointer"
       >
@@ -633,6 +733,7 @@ export default function OnlineBooking() {
           transition={{ duration: 0.2 }}
           className="w-full flex justify-center"
         >
+          {stage === STAGES.PROCEDURE && renderProcedureStage()}
           {stage === STAGES.DATETIME && renderDateTimeStage()}
           {stage === STAGES.FORM && renderFormStage()}
           {stage === STAGES.SUCCESS && renderSuccessStage()}
