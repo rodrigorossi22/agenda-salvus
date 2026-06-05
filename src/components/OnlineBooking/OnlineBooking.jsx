@@ -52,7 +52,7 @@ const PROCEDURES = [
     name: 'Drenagem Linfática',
     description: 'Redução de inchaço e retenção.',
     category: 'Desintoxicação',
-    feegowId: 343,
+    feegowId: 339,
     professionalId: '15', // Monica
     professionalName: 'Monica Sousa'
   },
@@ -488,13 +488,43 @@ export default function OnlineBooking() {
                 className="bg-white border border-[#e6e2dc] rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow duration-300"
               >
                 <div>
-                  <div className="border-b border-[#e6e2dc] pb-4 mb-6">
-                    <h3 className="text-xl font-serif text-[#2e2a25] font-medium">{category}</h3>
-                    <p className="text-[10px] text-[#a29382] tracking-wider uppercase mt-1">
-                      {category === 'Recuperação' && 'Alívio & Regeneração'}
-                      {category === 'Desintoxicação' && 'Purificação & Forma'}
-                      {category === 'Reset Mental' && 'Equilíbrio & Relaxamento'}
-                    </p>
+                  <div className="border-b border-[#e6e2dc] pb-4 mb-6 flex justify-between items-start">
+                    <div>
+                      <h3 className="text-xl font-serif text-[#2e2a25] font-medium">{category}</h3>
+                      <p className="text-[10px] text-[#a29382] tracking-wider uppercase mt-1">
+                        {category === 'Recuperação' && 'Alívio & Regeneração'}
+                        {category === 'Desintoxicação' && 'Purificação & Forma'}
+                        {category === 'Reset Mental' && 'Equilíbrio & Relaxamento'}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0 ml-4 p-1.5 bg-[#c5a059]/5 border border-[#c5a059]/10 rounded-xl text-[#c5a059]">
+                      {category === 'Recuperação' && (
+                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                          <path d="M6 21c0-4 2.5-6.5 6-6.5s6 2.5 6 6.5" />
+                          <path d="M3 11c1-.7 2-.7 3 0s2 .7 3 0" />
+                          <path d="M15 11c1-.7 2-.7 3 0s2 .7 3 0" />
+                          <circle cx="12" cy="9.5" r="1.5" fill="#c5a059" fillOpacity="0.15" />
+                          <circle cx="9" cy="14" r="1.5" fill="#c5a059" fillOpacity="0.15" />
+                          <circle cx="15" cy="14" r="1.5" fill="#c5a059" fillOpacity="0.15" />
+                        </svg>
+                      )}
+                      {category === 'Desintoxicação' && (
+                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                          <path d="M12 8c-1.5 1.5-1.5 3.5 0 5s1.5 3.5 0 5" />
+                          <path d="M9 11c1 1.5 1 3.5 0 5" strokeDasharray="1 1" />
+                        </svg>
+                      )}
+                      {category === 'Reset Mental' && (
+                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 21a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-2-4-2.5c-.5.5-2 1-4 2.5S5 12 5 14a7 7 0 0 0 7 7z" />
+                          <path d="M12 7c.5-1 1.5-2 3-2s-1 2.5-3 2.5z" />
+                          <path d="M12 7c-.5-1-1.5-2-3-2s1 2.5 3 2.5z" />
+                          <path d="M10 14c.5.5 1.5.5 2 0" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-4 mb-6">
