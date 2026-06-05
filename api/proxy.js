@@ -22,6 +22,8 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'VITE_FEEGOW_TOKEN not configured' });
     }
 
+    console.log('[Proxy] Requesting:', url.toString(), 'Token length:', token.length, 'Prefix:', token.substring(0, 15));
+
     try {
         const fetchOptions = {
             method: req.method || 'GET',
@@ -43,10 +45,20 @@ export default async function handler(req, res) {
         }
 
         const response = await fetch(url.toString(), fetchOptions);
-        const data = await response.json();
+        const responseText = await response.text();
 
-        // Forward status and data
-        res.status(response.status).json(data);
+        try {
+            const data = JSON.parse(responseText);
+            res.status(response.status).json(data);
+        } catch (jsonError) {
+            console.error('Feegow proxy response is not JSON. Status:', response.status);
+            console.error('Response body preview:', responseText.substring(0, 1000));
+            res.status(502).json({
+                error: 'Failed to parse JSON response from Feegow API',
+                status: response.status,
+                preview: responseText.substring(0, 500)
+            });
+        }
     } catch (error) {
         console.error('Feegow proxy error:', error);
         res.status(502).json({ error: 'Failed to proxy request to Feegow API' });
