@@ -552,13 +552,43 @@ export default function OnlineBooking() {
                 className="bg-white border border-[#e6e2dc] rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow duration-300"
               >
                 <div>
-                  <div className="border-b border-[#e6e2dc] pb-4 mb-6">
-                    <h3 className="text-xl font-serif text-[#2e2a25] font-medium">{category}</h3>
-                    <p className="text-[10px] text-[#a29382] tracking-wider uppercase mt-1">
-                      {category === 'Recuperação' && 'Alívio & Regeneração'}
-                      {category === 'Desintoxicação' && 'Purificação & Forma'}
-                      {category === 'Reset Mental' && 'Equilíbrio & Relaxamento'}
-                    </p>
+                  <div className="border-b border-[#e6e2dc] pb-4 mb-6 flex justify-between items-start">
+                    <div>
+                      <h3 className="text-xl font-serif text-[#2e2a25] font-medium">{category}</h3>
+                      <p className="text-[10px] text-[#a29382] tracking-wider uppercase mt-1">
+                        {category === 'Recuperação' && 'Alívio & Regeneração'}
+                        {category === 'Desintoxicação' && 'Purificação & Forma'}
+                        {category === 'Reset Mental' && 'Equilíbrio & Relaxamento'}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0 ml-4 p-1.5 bg-[#c5a059]/5 border border-[#c5a059]/10 rounded-xl text-[#c5a059]">
+                      {category === 'Recuperação' && (
+                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                          <path d="M6 21c0-4 2.5-6.5 6-6.5s6 2.5 6 6.5" />
+                          <path d="M3 11c1-.7 2-.7 3 0s2 .7 3 0" />
+                          <path d="M15 11c1-.7 2-.7 3 0s2 .7 3 0" />
+                          <circle cx="12" cy="9.5" r="1.5" fill="#c5a059" fillOpacity="0.15" />
+                          <circle cx="9" cy="14" r="1.5" fill="#c5a059" fillOpacity="0.15" />
+                          <circle cx="15" cy="14" r="1.5" fill="#c5a059" fillOpacity="0.15" />
+                        </svg>
+                      )}
+                      {category === 'Desintoxicação' && (
+                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                          <path d="M12 8c-1.5 1.5-1.5 3.5 0 5s1.5 3.5 0 5" />
+                          <path d="M9 11c1 1.5 1 3.5 0 5" strokeDasharray="1 1" />
+                        </svg>
+                      )}
+                      {category === 'Reset Mental' && (
+                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 21a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-2-4-2.5c-.5.5-2 1-4 2.5S5 12 5 14a7 7 0 0 0 7 7z" />
+                          <path d="M12 7c.5-1 1.5-2 3-2s-1 2.5-3 2.5z" />
+                          <path d="M12 7c-.5-1-1.5-2-3-2s1 2.5 3 2.5z" />
+                          <path d="M10 14c.5.5 1.5.5 2 0" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-4 mb-6">
@@ -568,97 +598,19 @@ export default function OnlineBooking() {
                         onClick={() => handleProcedureSelect(proc)}
                         className="w-full text-left bg-[#fdfbf7] hover:bg-[#c5a059]/5 border border-[#e6e2dc] hover:border-[#c5a059] rounded-xl p-4 transition-all duration-300 group cursor-pointer flex flex-col justify-between shadow-sm"
                       >
-                        <div className="flex gap-4 items-start w-full">
-                          {/* Ilustração Colorida em SVG à esquerda */}
-                          <div className="w-16 h-16 flex-shrink-0 bg-white border border-[#e6e2dc] group-hover:border-[#c5a059]/30 rounded-xl flex items-center justify-center p-1 shadow-sm transition-colors">
-                            {proc.id === 'ventosaterapia' && (
-                              <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M6 38c6-5 12-8 18-8s12 3 18 8v6H6v-6z" fill="#f5d6c6" />
-                                <path d="M24 30c-2-6-5-10-8-14" stroke="#e0b29b" strokeWidth="1.5" strokeLinecap="round" />
-                                <path d="M24 30c2-6 5-10 8-14" stroke="#e0b29b" strokeWidth="1.5" strokeLinecap="round" />
-                                <path d="M20 22a4 4 0 0 1 8 0v2h-8v-2z" fill="#a0d8ef" fillOpacity="0.6" stroke="#5cb3d1" strokeWidth="1.2" />
-                                <path d="M22 24a2 2 0 0 1 4 0h-4z" fill="#e78572" />
-                                <circle cx="24" cy="20" r="1" fill="#fff" fillOpacity="0.8" />
-                                <path d="M11 26a4 4 0 0 1 8 0v2h-8v-2z" fill="#a0d8ef" fillOpacity="0.6" stroke="#5cb3d1" strokeWidth="1.2" />
-                                <path d="M13 28a2 2 0 0 1 4 0h-4z" fill="#e78572" />
-                                <circle cx="15" cy="24" r="1" fill="#fff" fillOpacity="0.8" />
-                                <path d="M29 26a4 4 0 0 1 8 0v2h-8v-2z" fill="#a0d8ef" fillOpacity="0.6" stroke="#5cb3d1" strokeWidth="1.2" />
-                                <path d="M31 28a2 2 0 0 1 4 0h-4z" fill="#e78572" />
-                                <circle cx="33" cy="24" r="1" fill="#fff" fillOpacity="0.8" />
-                              </svg>
-                            )}
-                            {proc.id === 'eletroestimulacao' && (
-                              <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M24 6c-8 6-10 14-10 18s2 12 10 18c8-6 10-14 10-18S32 12 24 6z" fill="#e57373" fillOpacity="0.3" />
-                                <path d="M24 6c-4 6-6 14-6 18s2 12 6 18c4-6 6-14 6-18s-2-12-6-18z" fill="#e57373" fillOpacity="0.6" />
-                                <path d="M24 6v36M21 9c-3 5-4 11-4 15s1 10 4 15M27 9c3 5 4 11 4 15s-1 10-4 15" stroke="#ff8a80" strokeWidth="1" />
-                                <rect x="18" y="20" width="12" height="8" rx="2" fill="#5c6bc0" stroke="#3f51b5" strokeWidth="1" />
-                                <circle cx="24" cy="24" r="2" fill="#fff" />
-                                <path d="M5 24h6l2-4 2 8 2-6 2 2h4" stroke="#29b6f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M30 24h4l2-4 2 8 2-6 2 2h6" stroke="#29b6f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            )}
-                            {proc.id === 'shape-detox' && (
-                              <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M16 8c2 4 1 12 0 28s6 12 8 12 8-4 8-12-2-16-2-28" fill="#f5d6c6" />
-                                <path d="M16 22c3 1 5 3 8 3s5-2 8-3v4c-3 4-5 5-8 5s-5-1-8-5v-4z" fill="#e8f5e9" stroke="#c8e6c9" strokeWidth="0.8" />
-                                <circle cx="34" cy="14" r="8" fill="#81c784" stroke="#4caf50" strokeWidth="1" />
-                                <path d="M31 15.5l2-3 2 3" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M32 13.5c1-1 2.5-1 2.5-1s0 1.5-1 2.5c-.8.8-1.5 1-1.5 1s0-.7.7-1.5z" fill="#fff" />
-                                <path d="M34 11.5c.8-.8 2-.8 2-.8s0 1.2-1 2c-.6.6-1.2.8-1.2.8s0-.6.5-1.2z" fill="#fff" />
-                              </svg>
-                            )}
-                            {proc.id === 'drenagem-linfatica' && (
-                              <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M4 28c8-1 16-2 24-2s12 1 16 3v5H4v-6z" fill="#faf9f6" stroke="#e6e2dc" strokeWidth="1" />
-                                <path d="M8 23c6-2 15-3 22-1s12 3 14 5" stroke="#e0b29b" strokeWidth="1.5" fill="#f5d6c6" />
-                                <circle cx="41" cy="22" r="3.5" fill="#f5d6c6" stroke="#e0b29b" strokeWidth="1" />
-                                <path d="M18 15c1 1 2 4 0 6" stroke="#c5a059" strokeWidth="2.5" strokeLinecap="round" />
-                                <path d="M23 14c1 1 2 4 0 6" stroke="#c5a059" strokeWidth="2.5" strokeLinecap="round" />
-                                <path d="M12 21c2-1 4-1 6 0" stroke="#81c784" strokeWidth="1.2" strokeLinecap="round" />
-                                <path d="M15 21l3-1-2-2" stroke="#81c784" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            )}
-                            {proc.id === 'head-spa' && (
-                              <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M10 32c4-2 12-2 16 0v4H10v-4z" fill="#fff" stroke="#e6e2dc" strokeWidth="1" />
-                                <path d="M12 25c2-3 5-5 8-5s6 2 8 5" stroke="#e0b29b" strokeWidth="1.5" fill="#f5d6c6" />
-                                <path d="M20 20c-1-3-3-6-6-6s-6 3-6 6" fill="#5d4037" />
-                                <path d="M15 11c1 1.5 2 3 1.5 4.5" stroke="#c5a059" strokeWidth="2.5" strokeLinecap="round" />
-                                <path d="M12 2h12v3H12V2z" fill="#7a7065" />
-                                <path d="M9 5h18l-3 4H12L9 5z" fill="#c5a059" />
-                                <path d="M12 9l-4 9M18 9v10M24 9l4 9" stroke="#fff176" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2" />
-                              </svg>
-                            )}
-                            {proc.id === 'massagem-relaxante' && (
-                              <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M4 28c8-1 16-2 24-2s12 1 16 3v5H4v-6z" fill="#faf9f6" stroke="#e6e2dc" strokeWidth="1" />
-                                <path d="M8 23c6-2 15-3 22-1s12 3 14 5" stroke="#e0b29b" strokeWidth="1.5" fill="#f5d6c6" />
-                                <path d="M20 16c2 1 3 3.5 1.5 5" stroke="#c5a059" strokeWidth="2.5" strokeLinecap="round" />
-                                <path d="M26 15c2 1 3 3.5 1.5 5" stroke="#c5a059" strokeWidth="2.5" strokeLinecap="round" />
-                                <ellipse cx="14" cy="22" rx="3" ry="1.5" fill="#37474f" />
-                                <ellipse cx="21" cy="21" rx="3.5" ry="1.5" fill="#37474f" />
-                                <ellipse cx="28" cy="21.5" rx="3" ry="1.5" fill="#37474f" />
-                                <path d="M33 13l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z" fill="#fff176" />
-                              </svg>
-                            )}
+                        <div className="w-full">
+                          <div className="flex justify-between items-start gap-2">
+                            <h4 className="font-semibold text-sm text-[#2e2a25] group-hover:text-[#c5a059] transition-colors">
+                              {proc.name}
+                            </h4>
+                            <span className="text-[10px] bg-white border border-[#e6e2dc] text-[#7a7065] px-2 py-0.5 rounded-full whitespace-nowrap">
+                              60 min
+                            </span>
                           </div>
-
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start gap-2">
-                              <h4 className="font-semibold text-sm text-[#2e2a25] group-hover:text-[#c5a059] transition-colors">
-                                {proc.name}
-                              </h4>
-                              <span className="text-[10px] bg-white border border-[#e6e2dc] text-[#7a7065] px-2 py-0.5 rounded-full whitespace-nowrap">
-                                60 min
-                              </span>
-                            </div>
-                            <p className="text-xs text-[#7a7065] mt-1.5 leading-relaxed">
-                              {proc.description}
-                            </p>
-                          </div>
+                          <p className="text-xs text-[#7a7065] mt-1.5 leading-relaxed">
+                            {proc.description}
+                          </p>
                         </div>
-
                         <div className="flex items-center justify-between w-full mt-4 pt-2.5 border-t border-[#f2efeb] text-[10px] text-[#a29382]">
                           <span>Por: {proc.professionalName}</span>
                           <span className="text-[#c5a059] font-semibold flex items-center gap-0.5">
