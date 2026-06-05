@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -102,6 +102,7 @@ export default function OnlineBooking() {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState(null)
   const [appointmentDetails, setAppointmentDetails] = useState(null)
+  const dateInputRef = useRef(null)
 
   // Custom active professional derived from test mode or selected procedure
   const activeProfessionalId = isTestMode ? '1' : (selectedProcedure?.professionalId || '15')
@@ -298,6 +299,16 @@ export default function OnlineBooking() {
     setSelectedTime(time)
     setSelectedLocalId(localId)
     setStage(STAGES.FORM)
+  }
+
+  const handleCalendarButtonClick = () => {
+    if (dateInputRef.current) {
+      try {
+        dateInputRef.current.showPicker()
+      } catch (err) {
+        dateInputRef.current.click()
+      }
+    }
   }
 
   const handleBooking = async (e) => {
@@ -785,12 +796,16 @@ export default function OnlineBooking() {
             })}
 
             {/* Calendário Selector Button */}
-            <div className="relative flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-lg border border-[#e6e2dc] bg-white text-[#7a7065] hover:border-[#c5a059] hover:text-[#c5a059] hover:bg-[#c5a059]/5 transition-all duration-200 cursor-pointer overflow-hidden group">
-              <svg className="w-5 h-5 mb-1 text-[#7a7065] group-hover:text-[#c5a059] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div 
+              onClick={handleCalendarButtonClick}
+              className="relative flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-lg border border-[#e6e2dc] bg-white text-[#7a7065] hover:border-[#c5a059] hover:text-[#c5a059] hover:bg-[#c5a059]/5 transition-all duration-200 cursor-pointer overflow-hidden group"
+            >
+              <svg className="w-5 h-5 mb-1 text-[#7a7065] group-hover:text-[#c5a059] transition-colors pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <span className="text-[9px] font-semibold tracking-wider text-center">Outro Dia</span>
+              <span className="text-[9px] font-semibold tracking-wider text-center pointer-events-none">Outro Dia</span>
               <input 
+                ref={dateInputRef}
                 type="date"
                 min={format(new Date(), 'yyyy-MM-dd')}
                 onChange={(e) => {
