@@ -93,6 +93,7 @@ export default function OnlineBooking() {
   const [availableSlots, setAvailableSlots] = useState({})
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [isTestMode, setIsTestMode] = useState(false)
+  const [maxFetchedDate, setMaxFetchedDate] = useState(null)
 
   // Form fields
   const [name, setName] = useState('')
@@ -145,6 +146,11 @@ export default function OnlineBooking() {
       setIsTestMode(true)
     }
   }, [queryParams])
+
+  // Reset maxFetchedDate when test mode status changes
+  useEffect(() => {
+    setMaxFetchedDate(null)
+  }, [isTestMode])
   
   const getOrigemId = () => {
     const utmSource = (queryParams.get('utm_source') || '').toLowerCase()
@@ -168,8 +174,15 @@ export default function OnlineBooking() {
     setLoadingSlots(true)
     setErrorMessage(null)
     try {
-      const todayStr = format(new Date(), 'dd-MM-yyyy')
-      const futureStr = format(addDays(new Date(), 30), 'dd-MM-yyyy')
+      const today = new Date()
+      const todayStr = format(today, 'dd-MM-yyyy')
+      
+      // Fetch up to 30 days from today, or 14 days after selectedDate (whichever is later)
+      const standardLimit = addDays(today, 30)
+      const endLimit = addDays(selectedDate, 14)
+      const finalEnd = endLimit > standardLimit ? endLimit : standardLimit
+      const futureStr = format(finalEnd, 'dd-MM-yyyy')
+      
       const targetProcId = isTestMode ? 338 : (selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id)
       const data = await fetchAvailableSchedule({
         procedimento_id: targetProcId,
@@ -181,20 +194,23 @@ export default function OnlineBooking() {
       // Nesting resolution: content.profissional_id[activeProfessionalId].local_id
       const localMap = data.profissional_id?.[activeProfessionalId]?.local_id || {}
       setAvailableSlots(localMap)
+      setMaxFetchedDate(finalEnd)
     } catch (err) {
       console.error(err)
       setErrorMessage('Erro ao carregar horários disponíveis da Feegow. Tente novamente.')
     } finally {
       setLoadingSlots(false)
     }
-  }, [activeProfessionalId, selectedProcedure, isTestMode])
+  }, [activeProfessionalId, selectedProcedure, isTestMode, selectedDate])
 
-  // Load available slots when active professional or selected procedure changes, or stage changes to DATETIME
+  // Load available slots when active professional or selected procedure changes, or stage changes to DATETIME, or selectedDate is beyond the fetched range
   useEffect(() => {
     if (stage === STAGES.DATETIME && selectedProcedure) {
-      loadSlots()
+      if (!maxFetchedDate || selectedDate.getTime() > maxFetchedDate.getTime()) {
+        loadSlots()
+      }
     }
-  }, [loadSlots, stage, selectedProcedure])
+  }, [stage, selectedProcedure, selectedDate, maxFetchedDate, loadSlots])
 
   // Filter slots based on the Date, apply 60-min minimum duration filter and Scarcity rules
   const scarcitySlotsForDate = useMemo(() => {
@@ -274,6 +290,7 @@ export default function OnlineBooking() {
 
   const handleProcedureSelect = (proc) => {
     setSelectedProcedure(proc)
+    setMaxFetchedDate(null)
     setStage(STAGES.DATETIME)
   }
 
@@ -450,16 +467,59 @@ export default function OnlineBooking() {
     return list
   }, [selectedProcedure])
 
-  // Auto-reset selected date to the first available day if it's not in the weekdays list
+  // Combined list of weekdays plus the selected date if it's outside the standard 14 days
+  const weekdaysWithSelected = useMemo(() => {
+    const isSelectedInList = weekdays.some(
+      day => format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
+    )
+    if (!isSelectedInList && selectedDate) {
+      const combined = [...weekdays, selectedDate]
+      return combined.sort((a, b) => a.getTime() - b.getTime())
+    }
+    return weekdays
+  }, [weekdays, selectedDate])
+
+  // Auto-reset selected date to the first available day if it's invalid according to procedure rules
   useEffect(() => {
     if (weekdays.length > 0) {
-      const selectedKey = format(selectedDate, 'yyyy-MM-dd')
-      const isSelectedDayAvailable = weekdays.some(day => format(day, 'yyyy-MM-dd') === selectedKey)
-      if (!isSelectedDayAvailable) {
+      const dayOfWeek = selectedDate.getDay()
+      const isHeadSpa = selectedProcedure?.id === 'head-spa'
+      let isValid = false
+      if (isHeadSpa) {
+        isValid = (dayOfWeek === 1 || dayOfWeek === 2 || dayOfWeek === 3)
+      } else {
+        isValid = (dayOfWeek !== 0 && dayOfWeek !== 6)
+      }
+      
+      if (!isValid) {
         setSelectedDate(weekdays[0])
       }
     }
-  }, [weekdays, selectedDate])
+  }, [selectedProcedure, selectedDate, weekdays])
+
+  const handleCalendarDateSelect = (date) => {
+    const isHeadSpa = selectedProcedure?.id === 'head-spa'
+    const dayOfWeek = date.getDay()
+    
+    let isValid = false
+    let message = ''
+    
+    if (isHeadSpa) {
+      isValid = (dayOfWeek === 1 || dayOfWeek === 2 || dayOfWeek === 3)
+      message = 'O Head Spa da profissional Raquel Nina está disponível apenas de segunda a quarta-feira. Por favor, escolha um desses dias.'
+    } else {
+      isValid = (dayOfWeek !== 0 && dayOfWeek !== 6)
+      message = 'A clínica não realiza atendimentos aos finais de semana (sábado e domingo). Por favor, escolha um dia útil.'
+    }
+    
+    if (!isValid) {
+      alert(message)
+      return
+    }
+    
+    setSelectedDate(date)
+    setSelectedTime(null)
+  }
 
   const renderProcedureStage = () => {
     const categories = ['Recuperação', 'Desintoxicação', 'Reset Mental']
@@ -695,8 +755,8 @@ export default function OnlineBooking() {
         {/* Quick Date Selector tabs */}
         <div className="mb-8">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-3">1. Escolha o Dia</h3>
-          <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-thin">
-            {weekdays.map((day, idx) => {
+          <div className="flex gap-2 items-center overflow-x-auto pb-3 scrollbar-thin">
+            {weekdaysWithSelected.map((day, idx) => {
               const isSelected = format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
               return (
                 <button
@@ -717,6 +777,26 @@ export default function OnlineBooking() {
                 </button>
               )
             })}
+
+            {/* Calendário Selector Button */}
+            <div className="relative flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-lg border border-[#e6e2dc] bg-white text-[#7a7065] hover:border-[#c5a059] hover:text-[#c5a059] hover:bg-[#c5a059]/5 transition-all duration-200 cursor-pointer overflow-hidden group">
+              <svg className="w-5 h-5 mb-1 text-[#7a7065] group-hover:text-[#c5a059] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-[9px] font-semibold tracking-wider text-center">Outro Dia</span>
+              <input 
+                type="date"
+                min={format(new Date(), 'yyyy-MM-dd')}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    const [year, month, day] = e.target.value.split('-').map(Number);
+                    const chosenDate = new Date(year, month - 1, day);
+                    handleCalendarDateSelect(chosenDate);
+                  }
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+            </div>
           </div>
         </div>
 

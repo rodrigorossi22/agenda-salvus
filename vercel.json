@@ -1,5 +1,6 @@
 {
     "name": "agenda-salvus",
+    "regions": ["gru1"],
     "rewrites": [
         {
             "source": "/api/(.*)",

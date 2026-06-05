@@ -1,3 +1,4 @@
+/* global process */
 // Vercel serverless proxy for Feegow API
 // This proxies /api/* requests to https://api.feegow.com/v1/api/*
 // and adds the x-access-token header from the environment variable VITE_FEEGOW_TOKEN.
