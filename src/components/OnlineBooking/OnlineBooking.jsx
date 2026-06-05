@@ -213,7 +213,7 @@ export default function OnlineBooking() {
     }
   }, [stage, selectedProcedure, selectedDate, maxFetchedDate, loadSlots])
 
-  // Filter slots based on the Date, apply 60-min minimum duration filter and Scarcity rules
+  // Filter slots based on the Date, apply professional constraint rules
   const scarcitySlotsForDate = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd')
     
@@ -222,19 +222,6 @@ export default function OnlineBooking() {
     let evening = []
     let foundLocalId = null
 
-    // Helper to add 30 minutes to an HH:MM:SS time string
-    const add30Minutes = (timeStr) => {
-      const [h, m, s] = timeStr.split(':').map(Number)
-      let newM = m + 30
-      let newH = h
-      if (newM >= 60) {
-        newM -= 60
-        newH += 1
-      }
-      const pad = (n) => String(n).padStart(2, '0')
-      return `${pad(newH)}:${pad(newM)}:${pad(s)}`
-    }
-
     const isHeadSpa = selectedProcedure?.id === 'head-spa'
 
     for (const localId of Object.keys(availableSlots)) {
@@ -242,19 +229,15 @@ export default function OnlineBooking() {
       if (dateSlots.length > 0) {
         foundLocalId = localId
 
-        // Filter: Keep slot only if:
-        // 1. It fits the professional's hours (Monica starts before 20:00, Raquel between 14:00 and 16:00)
-        // 2. The subsequent 30-min block is also available (requires 60 min total)
+        // Filter: Keep slot only if it fits the professional's hours
+        // Raquel: strictly between 14h and 17h (last slot starts at 16h)
+        // Monica: starts before 20h
         const validSlots = dateSlots.filter(time => {
           if (isHeadSpa) {
-            // Raquel rules: strictly between 14h and 17h, last slot starts at 16h
-            if (time < '14:00:00' || time > '16:00:00') return false
+            return time >= '14:00:00' && time <= '16:00:00'
           } else {
-            // Monica rules: starts before 20h
-            if (time >= '20:00:00') return false
+            return time < '20:00:00'
           }
-          const nextTime = add30Minutes(time)
-          return dateSlots.includes(nextTime)
         })
 
         validSlots.forEach(time => {
@@ -288,6 +271,39 @@ export default function OnlineBooking() {
       localId: foundLocalId
     }
   }, [selectedDate, availableSlots, selectedProcedure])
+
+  // Extract dates that actually have slots available for selected procedure
+  const datesWithSlots = useMemo(() => {
+    const dates = new Set()
+    const isHeadSpa = selectedProcedure?.id === 'head-spa'
+
+    for (const localId of Object.keys(availableSlots)) {
+      const dateMap = availableSlots[localId] || {}
+      for (const dateKey of Object.keys(dateMap)) {
+        const slots = dateMap[dateKey] || []
+        
+        // Filter slots based on professional availability rules
+        const hasValidSlot = slots.some(time => {
+          if (isHeadSpa) {
+            return time >= '14:00:00' && time <= '16:00:00'
+          } else {
+            return time < '20:00:00'
+          }
+        })
+
+        if (hasValidSlot) {
+          dates.add(dateKey)
+        }
+      }
+    }
+
+    return Array.from(dates)
+      .map(dateStr => {
+        const [year, month, day] = dateStr.split('-').map(Number)
+        return new Date(year, month - 1, day)
+      })
+      .sort((a, b) => a.getTime() - b.getTime())
+  }, [availableSlots, selectedProcedure])
 
   const handleProcedureSelect = (proc) => {
     setSelectedProcedure(proc)
@@ -459,60 +475,31 @@ export default function OnlineBooking() {
     }
   }
 
-  // Weekdays only horizontal list builder (14 days, skipping sat/sun)
-  const weekdays = useMemo(() => {
-    const list = []
-    let current = new Date()
-    const isHeadSpa = selectedProcedure?.id === 'head-spa'
-    
-    while (list.length < 14) {
-      const dayOfWeek = current.getDay() // 0 = Sunday, 1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday
-      
-      if (isHeadSpa) {
-        // Raquel: Only Mondays (1), Tuesdays (2), Wednesdays (3)
-        if (dayOfWeek === 1 || dayOfWeek === 2 || dayOfWeek === 3) {
-          list.push(new Date(current))
-        }
-      } else {
-        // Monica: Mon to Fri (exclude Sat/Sun)
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-          list.push(new Date(current))
-        }
-      }
-      current = addDays(current, 1)
-    }
-    return list
-  }, [selectedProcedure])
-
-  // Combined list of weekdays plus the selected date if it's outside the standard 14 days
+  // Combined list of dates with slots plus the selected date if it's outside the list
   const weekdaysWithSelected = useMemo(() => {
-    const isSelectedInList = weekdays.some(
+    if (datesWithSlots.length === 0) return []
+
+    const isSelectedInList = datesWithSlots.some(
       day => format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
     )
     if (!isSelectedInList && selectedDate) {
-      const combined = [...weekdays, selectedDate]
+      const combined = [...datesWithSlots, selectedDate]
       return combined.sort((a, b) => a.getTime() - b.getTime())
     }
-    return weekdays
-  }, [weekdays, selectedDate])
+    return datesWithSlots
+  }, [datesWithSlots, selectedDate])
 
-  // Auto-reset selected date to the first available day if it's invalid according to procedure rules
+  // Auto-select first date that actually has slots when slots are loaded or selectedDate becomes invalid
   useEffect(() => {
-    if (weekdays.length > 0) {
-      const dayOfWeek = selectedDate.getDay()
-      const isHeadSpa = selectedProcedure?.id === 'head-spa'
-      let isValid = false
-      if (isHeadSpa) {
-        isValid = (dayOfWeek === 1 || dayOfWeek === 2 || dayOfWeek === 3)
-      } else {
-        isValid = (dayOfWeek !== 0 && dayOfWeek !== 6)
-      }
-      
-      if (!isValid) {
-        setSelectedDate(weekdays[0])
+    if (datesWithSlots.length > 0) {
+      const hasSlotsForSelected = datesWithSlots.some(
+        day => format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
+      )
+      if (!hasSlotsForSelected) {
+        setSelectedDate(datesWithSlots[0])
       }
     }
-  }, [selectedProcedure, selectedDate, weekdays])
+  }, [datesWithSlots, selectedDate])
 
   const handleCalendarDateSelect = (date) => {
     const isHeadSpa = selectedProcedure?.id === 'head-spa'
@@ -769,131 +756,152 @@ export default function OnlineBooking() {
           </div>
         )}
 
-        {/* Quick Date Selector tabs */}
-        <div className="mb-8">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-3">1. Escolha o Dia</h3>
-          <div className="flex gap-2 items-center overflow-x-auto pb-3 scrollbar-thin">
-            {weekdaysWithSelected.map((day, idx) => {
-              const isSelected = format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
-              return (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setSelectedDate(day)
-                    setSelectedTime(null)
-                  }}
-                  className={`flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-lg border transition-all duration-200 cursor-pointer ${
-                    isSelected 
-                      ? 'border-[#c5a059] bg-[#c5a059]/10 text-[#c5a059]' 
-                      : 'border-[#e6e2dc] bg-white text-[#7a7065] hover:border-[#a29382] hover:text-[#2e2a25]'
-                  }`}
-                >
-                  <span className="text-[10px] uppercase font-medium">{format(day, 'eee', { locale: ptBR })}</span>
-                  <span className="text-xl font-bold mt-1">{format(day, 'd')}</span>
-                  <span className="text-[10px] uppercase">{format(day, 'MMM', { locale: ptBR })}</span>
-                </button>
-              )
-            })}
-
-            {/* Calendário Selector Button */}
-            <div 
-              onClick={handleCalendarButtonClick}
-              className="relative flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-lg border border-[#e6e2dc] bg-white text-[#7a7065] hover:border-[#c5a059] hover:text-[#c5a059] hover:bg-[#c5a059]/5 transition-all duration-200 cursor-pointer overflow-hidden group"
+        {/* Seletor de Datas e Horários ou Mensagem de Sem Vagas */}
+        {!loadingSlots && datesWithSlots.length === 0 ? (
+          <div className="my-12 py-10 px-6 bg-[#faf9f6] border border-[#e6e2dc] rounded-2xl text-center max-w-xl mx-auto shadow-sm">
+            <h3 className="text-2xl font-serif text-[#2e2a25] mb-4">Agenda Totalmente Preenchida</h3>
+            <p className="text-sm text-[#7a7065] mb-8 leading-relaxed">
+              Nossos horários online para este procedimento com {selectedProcedure?.professionalName || 'a profissional'} estão temporariamente esgotados nos próximos dias.
+              Para solicitar um horário de encaixe personalizado ou entrar na lista de espera, entre em contato direto com a nossa recepção via WhatsApp.
+            </p>
+            <a 
+              href={import.meta.env.VITE_CLINIC_WHATSAPP || 'https://wa.me/5511999999999'} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="inline-flex items-center justify-center bg-[#c5a059] hover:bg-[#b08e4f] text-white font-bold py-3.5 px-8 rounded-lg uppercase tracking-widest text-xs transition-colors shadow-md text-center cursor-pointer"
             >
-              <svg className="w-5 h-5 mb-1 text-[#7a7065] group-hover:text-[#c5a059] transition-colors pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span className="text-[9px] font-semibold tracking-wider text-center pointer-events-none">Outro Dia</span>
-              <input 
-                ref={dateInputRef}
-                type="date"
-                min={format(new Date(), 'yyyy-MM-dd')}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    const [year, month, day] = e.target.value.split('-').map(Number);
-                    const chosenDate = new Date(year, month - 1, day);
-                    handleCalendarDateSelect(chosenDate);
-                  }
-                }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              />
-            </div>
+              Solicitar Encaixe no WhatsApp
+            </a>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Quick Date Selector tabs */}
+            <div className="mb-8">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-3">1. Escolha o Dia</h3>
+              <div className="flex gap-2 items-center overflow-x-auto pb-3 scrollbar-thin">
+                {weekdaysWithSelected.map((day, idx) => {
+                  const isSelected = format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setSelectedDate(day)
+                        setSelectedTime(null)
+                      }}
+                      className={`flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-lg border transition-all duration-200 cursor-pointer ${
+                        isSelected 
+                          ? 'border-[#c5a059] bg-[#c5a059]/10 text-[#c5a059]' 
+                          : 'border-[#e6e2dc] bg-white text-[#7a7065] hover:border-[#a29382] hover:text-[#2e2a25]'
+                      }`}
+                    >
+                      <span className="text-[10px] uppercase font-medium">{format(day, 'eee', { locale: ptBR })}</span>
+                      <span className="text-xl font-bold mt-1">{format(day, 'd')}</span>
+                      <span className="text-[10px] uppercase">{format(day, 'MMM', { locale: ptBR })}</span>
+                    </button>
+                  )
+                })}
 
-        {/* Time Selector grids */}
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-4">2. Horários Disponíveis</h3>
-
-          {loadingSlots ? (
-            <div className="flex justify-center items-center py-12 text-[#7a7065]">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#c5a059] border-t-transparent mr-2" />
-              Consultando agenda da Feegow...
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {/* Morning section */}
-              <div>
-                <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Manhã</h4>
-                {scarcitySlotsForDate.morning.length === 0 ? (
-                  <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da manhã.</p>
-                ) : (
-                  <div className="grid grid-cols-3 gap-3">
-                    {scarcitySlotsForDate.morning.map(time => (
-                      <button
-                        key={time}
-                        onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
-                        className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
-                      >
-                        {time.substring(0, 5)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Afternoon section */}
-              <div>
-                <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Tarde</h4>
-                {scarcitySlotsForDate.afternoon.length === 0 ? (
-                  <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da tarde.</p>
-                ) : (
-                  <div className="grid grid-cols-3 gap-3">
-                    {scarcitySlotsForDate.afternoon.map(time => (
-                      <button
-                        key={time}
-                        onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
-                        className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
-                      >
-                        {time.substring(0, 5)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Evening section */}
-              <div>
-                <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Noite</h4>
-                {scarcitySlotsForDate.evening.length === 0 ? (
-                  <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da noite.</p>
-                ) : (
-                  <div className="grid grid-cols-3 gap-3">
-                    {scarcitySlotsForDate.evening.map(time => (
-                      <button
-                        key={time}
-                        onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
-                        className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
-                      >
-                        {time.substring(0, 5)}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {/* Calendário Selector Button */}
+                <div 
+                  onClick={handleCalendarButtonClick}
+                  className="relative flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-lg border border-[#e6e2dc] bg-white text-[#7a7065] hover:border-[#c5a059] hover:text-[#c5a059] hover:bg-[#c5a059]/5 transition-all duration-200 cursor-pointer overflow-hidden group"
+                >
+                  <svg className="w-5 h-5 mb-1 text-[#7a7065] group-hover:text-[#c5a059] transition-colors pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-[9px] font-semibold tracking-wider text-center pointer-events-none">Outro Dia</span>
+                  <input 
+                    ref={dateInputRef}
+                    type="date"
+                    min={format(new Date(), 'yyyy-MM-dd')}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const [year, month, day] = e.target.value.split('-').map(Number);
+                        const chosenDate = new Date(year, month - 1, day);
+                        handleCalendarDateSelect(chosenDate);
+                      }
+                    }}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                  />
+                </div>
               </div>
             </div>
-          )}
-        </div>
+
+            {/* Time Selector grids */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-4">2. Horários Disponíveis</h3>
+
+              {loadingSlots ? (
+                <div className="flex justify-center items-center py-12 text-[#7a7065]">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#c5a059] border-t-transparent mr-2" />
+                  Consultando agenda da Feegow...
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {/* Morning section */}
+                  <div>
+                    <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Manhã</h4>
+                    {scarcitySlotsForDate.morning.length === 0 ? (
+                      <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da manhã.</p>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-3">
+                        {scarcitySlotsForDate.morning.map(time => (
+                          <button
+                            key={time}
+                            onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
+                            className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
+                          >
+                            {time.substring(0, 5)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Afternoon section */}
+                  <div>
+                    <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Tarde</h4>
+                    {scarcitySlotsForDate.afternoon.length === 0 ? (
+                      <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da tarde.</p>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-3">
+                        {scarcitySlotsForDate.afternoon.map(time => (
+                          <button
+                            key={time}
+                            onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
+                            className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
+                          >
+                            {time.substring(0, 5)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Evening section */}
+                  <div>
+                    <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Noite</h4>
+                    {scarcitySlotsForDate.evening.length === 0 ? (
+                      <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da noite.</p>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-3">
+                        {scarcitySlotsForDate.evening.map(time => (
+                          <button
+                            key={time}
+                            onClick={() => handleTimeSelect(time, scarcitySlotsForDate.localId)}
+                            className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
+                          >
+                            {time.substring(0, 5)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     )
   }
