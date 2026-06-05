@@ -381,12 +381,15 @@ export default function OnlineBooking() {
         setStage(STAGES.SUCCESS)
       } catch (err) {
         console.error(err)
+        const isFeegowError = err.message?.includes('Feegow')
         setErrorMessage(
-          err.message?.includes('Feegow')
+          isFeegowError
             ? err.message
             : 'Este horário foi preenchido recentemente por outro paciente. Por favor, selecione outra vaga.'
         )
-        loadSlots()
+        if (!isFeegowError) {
+          loadSlots()
+        }
       } finally {
         setSubmitting(false)
       }
@@ -430,12 +433,15 @@ export default function OnlineBooking() {
         setStage(STAGES.SUCCESS)
       } catch (err) {
         console.error(err)
+        const isFeegowError = err.message?.includes('Feegow')
         setErrorMessage(
-          err.message?.includes('Feegow')
+          isFeegowError
             ? err.message
             : 'Este horário foi preenchido recentemente por outro paciente. Por favor, selecione outra vaga.'
         )
-        loadSlots()
+        if (!isFeegowError) {
+          loadSlots()
+        }
       } finally {
         setSubmitting(false)
       }
