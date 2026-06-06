@@ -54,8 +54,12 @@ export async function fetchPatient(paciente_id) {
   return data.content ?? null
 }
 
-export async function fetchAppointments(dateStart, dateEnd = dateStart) {
-  const params = new URLSearchParams({ data_start: dateStart, data_end: dateEnd })
+export async function fetchAppointments(dateStart, dateEnd = dateStart, paciente_id = null) {
+  const query = { data_start: dateStart, data_end: dateEnd }
+  if (paciente_id) {
+    query.paciente_id = String(paciente_id)
+  }
+  const params = new URLSearchParams(query)
   const data = await request(`/appoints/search?${params}`)
   const rawAppointments = data.content ?? data ?? []
 

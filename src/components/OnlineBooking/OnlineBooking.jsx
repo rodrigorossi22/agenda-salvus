@@ -1,9 +1,9 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { format, addDays } from 'date-fns'
+import { format, addDays, startOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
-import { fetchAvailableSchedule, searchPatient, createPatient, createAppointment } from '../../services/feegow'
+import { fetchAvailableSchedule, searchPatient, createPatient, createAppointment, fetchProcedures, fetchAppointments } from '../../services/feegow'
 import salvusLogo from '../../assets/logo_transparent.png'
 
 const DEFAULT_PROCEDURE = {
@@ -76,6 +76,12 @@ const PROCEDURES = [
   }
 ]
 
+function timeToMinutes(timeStr) {
+  if (!timeStr) return 0
+  const parts = timeStr.split(':').map(Number)
+  return parts[0] * 60 + parts[1]
+}
+
 export default function OnlineBooking() {
   const [stage, setStage] = useState(STAGES.PROCEDURE)
   const [selectedProcedure, setSelectedProcedure] = useState(null)
@@ -94,6 +100,13 @@ export default function OnlineBooking() {
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [isTestMode, setIsTestMode] = useState(false)
   const [maxFetchedDate, setMaxFetchedDate] = useState(null)
+
+  const [procedureDurations, setProcedureDurations] = useState({})
+  const [appointmentsForSelectedDate, setAppointmentsForSelectedDate] = useState([])
+  const [loadingAppointments, setLoadingAppointments] = useState(false)
+
+  const [patientMonthlyAppointments, setPatientMonthlyAppointments] = useState([])
+  const [loadingCpfHistory, setLoadingCpfHistory] = useState(false)
 
   // Form fields
   const [name, setName] = useState('')
@@ -114,6 +127,47 @@ export default function OnlineBooking() {
     setSearchFailed(false)
   }
 
+  const handleBirthDateChange = (e) => {
+    let value = e.target.value
+    
+    // Remove qualquer caractere não-numérico
+    const digits = value.replace(/\D/g, '')
+    
+    // Limita o input a no máximo 8 dígitos (DDMMYYYY)
+    const truncated = digits.slice(0, 8)
+    
+    // Aplica a máscara DD/MM/AAAA dinamicamente
+    let formatted = ''
+    if (truncated.length > 0) {
+      formatted += truncated.slice(0, 2)
+    }
+    if (truncated.length > 2) {
+      formatted += '/' + truncated.slice(2, 4)
+    }
+    if (truncated.length > 4) {
+      formatted += '/' + truncated.slice(4, 8)
+    }
+    
+    setBirthDate(formatted)
+  }
+
+  const handleBirthDateBlur = (e) => {
+    let value = e.target.value
+    if (!value) return
+
+    const parts = value.split('/')
+    if (parts.length === 3 && parts[2].length === 2) {
+      const yy = Number(parts[2])
+      const currentYear2Digits = new Date().getFullYear() % 100 // 26 em 2026
+      
+      // Regra de século: se for maior que o ano atual (26), assume século passado (19YY), senão século atual (20YY)
+      const fullYear = yy > currentYear2Digits ? 1900 + yy : 2000 + yy
+      
+      parts[2] = String(fullYear)
+      setBirthDate(parts.join('/'))
+    }
+  }
+
   const handleSearchPatient = async () => {
     if (!phone.trim()) {
       setErrorMessage('Por favor, preencha o campo de celular.')
@@ -127,6 +181,7 @@ export default function OnlineBooking() {
       if (result && result.patient_id) {
         setFoundPatientId(result.patient_id)
         setFoundPatientName(result.nome)
+        loadCpfHistory(result.patient_id)
       } else {
         setSearchFailed(true)
       }
@@ -152,6 +207,105 @@ export default function OnlineBooking() {
   useEffect(() => {
     setMaxFetchedDate(null)
   }, [isTestMode])
+
+  // Load procedure durations from Feegow on mount
+  useEffect(() => {
+    async function loadDurations() {
+      try {
+        const list = await fetchProcedures()
+        const map = {}
+        list.forEach(p => {
+          const id = p.id || p.procedimento_id
+          const time = Number(p.tempo) || 60
+          if (id) {
+            map[id] = time
+          }
+        })
+        setProcedureDurations(map)
+      } catch (err) {
+        console.error('Erro ao carregar durações dos procedimentos:', err)
+      }
+    }
+    loadDurations()
+  }, [])
+
+  // Load appointments for selected professional and date (to prevent collisions)
+  useEffect(() => {
+    let active = true
+    async function loadDailyAppointments() {
+      if (stage !== STAGES.DATETIME || !activeProfessionalId || !selectedDate) return
+      setLoadingAppointments(true)
+      try {
+        const dateStr = format(selectedDate, 'dd-MM-yyyy')
+        const appts = await fetchAppointments(dateStr, dateStr)
+        const filteredAppts = appts.filter(a => String(a.profissional_id) === String(activeProfessionalId))
+        if (active) {
+          setAppointmentsForSelectedDate(filteredAppts)
+        }
+      } catch (err) {
+        console.error('Erro ao buscar agendamentos do dia:', err)
+      } finally {
+        if (active) setLoadingAppointments(false)
+      }
+    }
+    loadDailyAppointments()
+    return () => { active = false }
+  }, [selectedDate, activeProfessionalId, stage])
+
+  // Load patient appointments history for the current selectedDate month
+  const loadCpfHistory = useCallback(async (patientId) => {
+    if (!patientId || !selectedDate) return
+    setLoadingCpfHistory(true)
+    setErrorMessage(null)
+    try {
+      const year = selectedDate.getFullYear()
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+      const dateStart = `01-${month}-${year}`
+      const lastDay = new Date(year, selectedDate.getMonth() + 1, 0).getDate()
+      const dateEnd = `${String(lastDay).padStart(2, '0')}-${month}-${year}`
+      
+      const appts = await fetchAppointments(dateStart, dateEnd, patientId)
+      const activeAppts = appts.filter(
+        (a) => ![11, 12, 13, 14, 16, 21].includes(a.status_id)
+      )
+      setPatientMonthlyAppointments(activeAppts)
+
+      // Verificação preventiva de limites
+      if (activeAppts.length >= 2) {
+        setErrorMessage('Este horário não está mais disponível para agendamento online. Por favor, fale no WhatsApp para consultar vagas.')
+        return
+      }
+
+      const getStartOfWeek = (d) => startOfWeek(d, { weekStartsOn: 1 })
+      const targetStart = getStartOfWeek(selectedDate)
+      const targetStartStr = format(targetStart, 'yyyy-MM-dd')
+      
+      const hasWeekly = activeAppts.some(appt => {
+        const [day, month, year] = appt.data.split('-').map(Number)
+        const apptDate = new Date(year, month - 1, day)
+        const apptStart = getStartOfWeek(apptDate)
+        const apptStartStr = format(apptStart, 'yyyy-MM-dd')
+        return targetStartStr === apptStartStr
+      })
+
+      if (hasWeekly) {
+        setErrorMessage('Identificamos que você já possui um agendamento nesta semana. A política da clínica permite apenas 1 agendamento por semana.')
+      }
+    } catch (err) {
+      console.error('Erro ao buscar histórico de agendamentos por CPF:', err)
+    } finally {
+      setLoadingCpfHistory(false)
+    }
+  }, [selectedDate])
+
+  // Reload history when selectedDate (month/year) or foundPatientId changes
+  useEffect(() => {
+    if (foundPatientId && selectedDate) {
+      loadCpfHistory(foundPatientId)
+    } else {
+      setPatientMonthlyAppointments([])
+    }
+  }, [foundPatientId, selectedDate?.getMonth(), selectedDate?.getFullYear(), loadCpfHistory])
   
   const getOrigemId = () => {
     const utmSource = (queryParams.get('utm_source') || '').toLowerCase()
@@ -213,7 +367,7 @@ export default function OnlineBooking() {
     }
   }, [stage, selectedProcedure, selectedDate, maxFetchedDate, loadSlots])
 
-  // Filter slots based on the Date, apply professional constraint rules
+  // Filter slots based on the Date, apply professional constraint rules & prevent collision
   const scarcitySlotsForDate = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd')
     
@@ -223,21 +377,49 @@ export default function OnlineBooking() {
     let foundLocalId = null
 
     const isHeadSpa = selectedProcedure?.id === 'head-spa'
+    const durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
+
+    // Se ultrapassou o limite mensal (silencioso), não exibe nenhum slot no mês!
+    if (patientMonthlyAppointments.length >= 2) {
+      return {
+        morning: [],
+        afternoon: [],
+        evening: [],
+        localId: null
+      }
+    }
 
     for (const localId of Object.keys(availableSlots)) {
       const dateSlots = availableSlots[localId]?.[dateKey] || []
       if (dateSlots.length > 0) {
         foundLocalId = localId
 
-        // Filter: Keep slot only if it fits the professional's hours
+        // Filter: Keep slot only if it fits the professional's hours & doesn't collide with other appointments
         // Raquel: strictly between 14h and 17h (last slot starts at 16h)
         // Monica: starts before 20h
         const validSlots = dateSlots.filter(time => {
+          let fitsHours = false
           if (isHeadSpa) {
-            return time >= '14:00:00' && time <= '16:00:00'
+            fitsHours = time >= '14:00:00' && time <= '16:00:00'
           } else {
-            return time < '20:00:00'
+            fitsHours = time < '20:00:00'
           }
+          
+          if (!fitsHours) return false
+
+          const slotStart = timeToMinutes(time)
+          const slotEnd = slotStart + durationMinutes
+
+          const hasCollision = appointmentsForSelectedDate.some(appt => {
+            const apptStart = timeToMinutes(appt.horario)
+            const apptDuration = Number(appt.duracao) || 60
+            const apptEnd = apptStart + apptDuration
+
+            // Overlap check
+            return slotStart < apptEnd && slotEnd > apptStart
+          })
+
+          return !hasCollision
         })
 
         validSlots.forEach(time => {
@@ -270,12 +452,17 @@ export default function OnlineBooking() {
       evening: limitedEvening,
       localId: foundLocalId
     }
-  }, [selectedDate, availableSlots, selectedProcedure])
+  }, [selectedDate, availableSlots, selectedProcedure, appointmentsForSelectedDate, procedureDurations])
 
   // Extract dates that actually have slots available for selected procedure
   const datesWithSlots = useMemo(() => {
     const dates = new Set()
     const isHeadSpa = selectedProcedure?.id === 'head-spa'
+
+    // Se ultrapassou o limite mensal (silencioso), nenhuma data estará disponível para agendamento!
+    if (patientMonthlyAppointments.length >= 2) {
+      return []
+    }
 
     for (const localId of Object.keys(availableSlots)) {
       const dateMap = availableSlots[localId] || {}
@@ -365,7 +552,9 @@ export default function OnlineBooking() {
         const parts = birthDate.split('/')
         const formattedBirthDate = `${parts[2]}-${parts[1]}-${parts[0]}`
 
-        const originId = getOrigemId()
+        // Padrão Gympass (ID 23) conforme solicitação do usuário.
+        // IMPORTANTE: Ao expandir para procedimentos não-Gympass no futuro, restaurar para getOrigemId().
+        const originId = 23
         
         // Criar paciente
         const newPatientId = await createPatient({
@@ -430,6 +619,29 @@ export default function OnlineBooking() {
 
       if (!foundPatientId) {
         setErrorMessage('Por favor, busque seu cadastro antes de confirmar.')
+        return
+      }
+
+      // Verificação final e rigorosa de limites na submissão
+      if (patientMonthlyAppointments.length >= 2) {
+        setErrorMessage('Este horário não está mais disponível para agendamento online. Por favor, fale no WhatsApp para consultar vagas.')
+        return
+      }
+
+      const getStartOfWeek = (d) => startOfWeek(d, { weekStartsOn: 1 })
+      const targetStart = getStartOfWeek(selectedDate)
+      const targetStartStr = format(targetStart, 'yyyy-MM-dd')
+      
+      const hasWeekly = patientMonthlyAppointments.some(appt => {
+        const [day, month, year] = appt.data.split('-').map(Number)
+        const apptDate = new Date(year, month - 1, day)
+        const apptStart = getStartOfWeek(apptDate)
+        const apptStartStr = format(apptStart, 'yyyy-MM-dd')
+        return targetStartStr === apptStartStr
+      })
+
+      if (hasWeekly) {
+        setErrorMessage('Identificamos que você já possui um agendamento nesta semana. A política da clínica permite apenas 1 agendamento por semana.')
         return
       }
 
@@ -573,75 +785,77 @@ export default function OnlineBooking() {
                           <div className="w-16 h-16 flex-shrink-0 bg-white border border-[#e6e2dc] group-hover:border-[#c5a059]/30 rounded-xl flex items-center justify-center p-1 shadow-sm transition-colors">
                             {proc.id === 'ventosaterapia' && (
                               <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M4 36c4-1 12-3 20-3s16 2 20 3v4H4v-4z" fill="#FAF9F6" stroke="#E6E2DC" strokeWidth="0.8" />
-                                <path d="M6 30c8-2 18-3 26-1s9 2 10 3v4H6v-6z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="1" />
-                                <path d="M11 20c0-3.3 2.7-6 6-6s6 2.7 6 6a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1z" fill="#A0D8EF" fillOpacity="0.7" stroke="#4FB9DF" strokeWidth="1" />
-                                <rect x="16.5" y="11" width="1" height="3" rx="0.5" fill="#C5A059" />
-                                <circle cx="17" cy="22" r="3" fill="#E78572" fillOpacity="0.4" />
-                                <path d="M22 18c0-3.3 2.7-6 6-6s6 2.7 6 6a1 1 0 0 1-1 1H23a1 1 0 0 1-1-1z" fill="#A0D8EF" fillOpacity="0.7" stroke="#4FB9DF" strokeWidth="1" />
-                                <rect x="27.5" y="9" width="1" height="3" rx="0.5" fill="#C5A059" />
-                                <circle cx="28" cy="20" r="3" fill="#E78572" fillOpacity="0.4" />
-                                <path d="M33 22c0-3.3 2.7-6 6-6s6 2.7 6 6a1 1 0 0 1-1 1H34a1 1 0 0 1-1-1z" fill="#A0D8EF" fillOpacity="0.7" stroke="#4FB9DF" strokeWidth="1" />
-                                <rect x="38.5" y="13" width="1" height="3" rx="0.5" fill="#C5A059" />
-                                <circle cx="39" cy="24" r="3" fill="#E78572" fillOpacity="0.4" />
+                                <path d="M2 38h44v4H2v-4z" fill="#F5F4F0" stroke="#E6E2DC" strokeWidth="0.8" />
+                                <path d="M4 32c4-2 12-4 20-4s18 2 22 4v6H4v-6z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
+                                <circle cx="15" cy="26" r="3.5" fill="#EF5350" fillOpacity="0.4" />
+                                <path d="M11 25c0-3.3 1.8-6 4-6s4 2.7 4 6h-8z" fill="#81D4FA" fillOpacity="0.5" stroke="#0288D1" strokeWidth="0.8" />
+                                <rect x="14.5" y="16" width="1" height="3" rx="0.5" fill="#C4A47C" />
+                                <circle cx="24" cy="25" r="3.5" fill="#EF5350" fillOpacity="0.4" />
+                                <path d="M20 24c0-3.3 1.8-6 4-6s4 2.7 4 6h-8z" fill="#81D4FA" fillOpacity="0.5" stroke="#0288D1" strokeWidth="0.8" />
+                                <rect x="23.5" y="15" width="1" height="3" rx="0.5" fill="#C4A47C" />
+                                <circle cx="33" cy="26" r="3.5" fill="#EF5350" fillOpacity="0.4" />
+                                <path d="M29 25c0-3.3 1.8-6 4-6s4 2.7 4 6h-8z" fill="#81D4FA" fillOpacity="0.5" stroke="#0288D1" strokeWidth="0.8" />
+                                <rect x="32.5" y="16" width="1" height="3" rx="0.5" fill="#C4A47C" />
                               </svg>
                             )}
                             {proc.id === 'eletroestimulacao' && (
                               <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M24 4c-6 8-8 16-8 20s2 12 8 20c6-8 8-16 8-20S30 12 24 4z" fill="#E57373" fillOpacity="0.4" />
-                                <path d="M24 4c-3.5 8-5 16-5 20s1.5 12 5 20c3.5-8 5-16 5-20s-1.5-12-5-20z" fill="#E57373" fillOpacity="0.8" />
-                                <path d="M24 4v40M21 7c-2 5-3 11-3 17s1 10 4 15M27 7c2 5 3 11 3 17s-1 12-3 17" stroke="#FF8A80" strokeWidth="0.8" />
-                                <rect x="17" y="20" width="14" height="8" rx="2" fill="#5C6BC0" stroke="#3F51B5" strokeWidth="1" />
-                                <circle cx="24" cy="24" r="2.5" fill="#FFF" />
-                                <path d="M24 24h-7M24 24h7" stroke="#FFF" strokeWidth="0.8" />
-                                <path d="M6 24h6l2-4 2 8 2-6 2 2h3" stroke="#29B6F6" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M29 24h3l2-4 2 8 2-6 2 2h6" stroke="#29B6F6" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M24 4c-5 8-8 16-8 20s3 12 8 20c5-8 8-16 8-20S29 12 24 4z" fill="#E57373" stroke="#C62828" strokeWidth="0.8" />
+                                <path d="M24 4v40M21 8c-2.5 5-3.5 11-3.5 16s1 11 3.5 16M27 8c2.5 5 3.5 11 3.5 16s-1 11-3.5 16" stroke="#FF8A80" strokeWidth="0.8" />
+                                <rect x="20" y="16" width="8" height="5" rx="1" fill="#ECEFF1" stroke="#90A4AE" strokeWidth="0.8" />
+                                <circle cx="24" cy="18.5" r="1.5" fill="#37474F" />
+                                <rect x="20" y="28" width="8" height="5" rx="1" fill="#ECEFF1" stroke="#90A4AE" strokeWidth="0.8" />
+                                <circle cx="24" cy="30.5" r="1.5" fill="#37474F" />
+                                <path d="M24 18.5c-4 2-4 10 0 12" stroke="#78909C" strokeWidth="0.6" fill="none" />
+                                <path d="M12 18l2.5 2-2.5 2 2.5 2-2.5 2M36 18l-2.5 2 2.5 2-2.5 2 2.5 2" stroke="#29B6F6" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                                <path d="M10 24l2 1.5-2 1.5 2 1.5M38 24l-2 1.5 2 1.5-2 1.5" stroke="#00E5FF" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                               </svg>
                             )}
                             {proc.id === 'shape-detox' && (
                               <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M16 6c1.5 3 1 10 0 24s1.5 12 3 12c1 0 1.5-1 2.5-6h5c1 5 1.5 6 2.5 6c1.5 0 3-12 3-12s-1.5-21 0-24" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                                <path d="M16 16c4 1.5 8 1.5 16 0v3c-4 4-6 5-8 5s-4-1-8-5v-3z" fill="#FFF" stroke="#E6E2DC" strokeWidth="0.8" />
-                                <path d="M17.5 24c2.5 0.5 5 0.5 7.5 0M25.5 26c2 0.3 3.5 0.3 5 0" stroke="#C5A059" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-                                <path d="M18 29c2 0.5 4 0.5 6 0M26.5 31c1.5 0.3 3 0.3 4 0" stroke="#C5A059" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-                                <circle cx="34" cy="15" r="7" fill="#81C784" stroke="#4CAF50" strokeWidth="1" />
-                                <path d="M32 16.5l2-3 2 3" stroke="#FFF" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M33 14.5c1-1 2-1 2-1s0 1-1 2c-.5.5-1 .5-1 .5s0-.3.5-.9z" fill="#FFF" />
+                                <path d="M17 6c1.5 4 1 12 0 24s1.5 12 3.5 12c1 0 2-1 3-6h1c1 5 2 6 3 6c2 0 3.5-12 3.5-12s-1.5-20 0-24c-2 0-3 3-7 3s-5-3-7-3z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
+                                <path d="M17.5 16c3.5 1 6.5 1 13 0v3c-3 3.5-5 4-6.5 4s-3.5-.5-6.5-4v-3z" fill="#FFFFFF" stroke="#E6E2DC" strokeWidth="0.8" />
+                                <path d="M18.5 22.5c2.5.5 5.5.5 8 0M19 25.5c2.5.5 5 .5 7.5 0M20 28.5c2 .5 4 .5 6 0M20.5 31.5c1.5.3 3 .3 4.5 0" stroke="#C4A47C" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+                                <circle cx="35" cy="13" r="6" fill="#4CAF50" stroke="#388E3C" strokeWidth="0.8" />
+                                <path d="M33.5 14.5c1-1.5 2.5-1.5 2.5-1.5s0 1.5-1.5 2.5c-.8.8-1 .8-1 .8s0-.3.5-1.3z" fill="#FFFFFF" />
+                                <path d="M36.5 12.5c-.5-1-1.5-1-1.5-1s0 1.2 1 1.5c.6.2.7.2.7.2s-.1-.2-.2-.7z" fill="#FFFFFF" />
                               </svg>
                             )}
                             {proc.id === 'drenagem-linfatica' && (
                               <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <rect x="4" y="32" width="40" height="6" rx="1" fill="#FAF9F6" stroke="#E6E2DC" strokeWidth="0.8" />
-                                <path d="M6 26c6-2 15-3 22-1s12 3 14 5v2H6v-6z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                                <circle cx="40" cy="24" r="3.5" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                                <path d="M12 16c2-4 5-6 8-6s6 2 6 6l-1 8h-12l-1-8z" fill="#5C6BC0" stroke="#3F51B5" strokeWidth="0.8" />
-                                <path d="M14 20c2 2 4 5 5 7M26 20c-2 2-4 5-5 7" stroke="#F5D6C6" strokeWidth="2.2" strokeLinecap="round" />
-                                <circle cx="20" cy="8" r="3.5" fill="#5D4037" />
+                                <rect x="4" y="34" width="40" height="5" rx="1" fill="#F5F4F0" stroke="#E6E2DC" strokeWidth="0.8" />
+                                <path d="M6 28c6-2 15-3 22-1s12 3 14 5v3H6v-7z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
+                                <circle cx="40" cy="26" r="3" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
+                                <path d="M22 28.5c4 0 8 1 14 3.5v3.5H22v-7z" fill="#FFFFFF" stroke="#E6E2DC" strokeWidth="0.8" />
+                                <path d="M11 15c2-3.5 5-5 8-5s6 2.5 6 6l-1 8h-12l-1-9z" fill="#3F51B5" stroke="#303F9F" strokeWidth="0.8" />
+                                <circle cx="19" cy="7.5" r="3" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
+                                <path d="M14 21c1.5 2 3.5 5 4.5 7M23 21c-1.5 2-3 5-4 7" stroke="#F5D6C6" strokeWidth="2" strokeLinecap="round" />
+                                <path d="M26 25.5c2-1 4-1 6-.5M27 27.5c1.5-.7 3-.7 4.5-.3" stroke="#C4A47C" strokeWidth="0.8" strokeLinecap="round" fill="none" />
                               </svg>
                             )}
                             {proc.id === 'head-spa' && (
                               <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M16 34c4-1.5 8-1.5 12 0v4H16v-4z" fill="#FAF9F6" stroke="#E6E2DC" strokeWidth="0.8" />
-                                <path d="M18 28c2-3.5 6-5 9-5s6 2 8 5" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                                <path d="M26 23c-1.5-3.5-4.5-6-9-6s-8 3-8 7c0 4 3.5 7.5 8 7.5" fill="#5D4037" />
-                                <path d="M14 4h20v2H14V4z" fill="#7A7065" />
-                                <path d="M11 6h26l-3 4H14l-3-4z" fill="#C5A059" />
-                                <path d="M14 10l-3 8M20 10v10M26 10v10M32 10l3-8" stroke="#FFF176" strokeWidth="1" strokeLinecap="round" strokeDasharray="2 2" />
-                                <path d="M23 14c1 1.5 2 3 1.5 4.5" stroke="#C5A059" strokeWidth="2" strokeLinecap="round" fill="none" />
-                                <path d="M29 13.5c0 1.5 1.5 3 1 4.5" stroke="#C5A059" strokeWidth="2" strokeLinecap="round" fill="none" />
+                                <path d="M6 34c4-1.5 12-2 20-2s16 .5 20 2v5H6v-5z" fill="#FAF9F6" stroke="#E6E2DC" strokeWidth="0.8" />
+                                <path d="M16 29c2-3.5 6-5 9-5s6 2 8 5" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
+                                <path d="M22 24.5c-2-3.5-5-5-9.5-5s-8 3-8 7c0 4 3.5 7.5 8.5 7.5" fill="#5D4037" />
+                                <path d="M22 17c1 1.5 2 2.5 1.5 4M27 16.5c0 1.5 1 2.5.5 4" stroke="#F5D6C6" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                                <path d="M15 3h18v2H15V3z" fill="#7A7065" />
+                                <path d="M12 5h24l-3 4H15l-3-4z" fill="#C4A47C" stroke="#B5966d" strokeWidth="0.8" />
+                                <path d="M16 9l-3 9M21 9v11M27 9v11M32 9l3-8" stroke="#FFF59D" strokeWidth="1" strokeLinecap="round" strokeDasharray="2 2" />
+                                <path d="M13 9c2 3 5 6 9 8M35 9c-2 3-5 6-9 8" fill="none" stroke="#FFF176" strokeWidth="0.8" opacity="0.4" />
                               </svg>
                             )}
                             {proc.id === 'massagem-relaxante' && (
                               <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <rect x="4" y="32" width="40" height="6" rx="1" fill="#FAF9F6" stroke="#E6E2DC" strokeWidth="0.8" />
-                                <path d="M6 26c6-2 15-3 22-1s12 3 14 5v2H6v-6z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                                <circle cx="40" cy="24" r="3.5" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                                <ellipse cx="16" cy="25" rx="2.5" ry="1.2" fill="#37474F" />
-                                <ellipse cx="22" cy="24.5" rx="3" ry="1.2" fill="#37474F" />
-                                <ellipse cx="28" cy="25" rx="2.5" ry="1.2" fill="#37474F" />
-                                <path d="M12 14c1 1.5 2 3.5 1.2 5.5" stroke="#C5A059" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-                                <path d="M18 13c1 1.5 2 3.5 1.2 5.5" stroke="#C5A059" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-                                <path d="M33 11l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z" fill="#FFF176" />
+                                <rect x="4" y="34" width="40" height="5" rx="1" fill="#F5F4F0" stroke="#E6E2DC" strokeWidth="0.8" />
+                                <path d="M6 28c6-2 15-3 22-1s12 3 14 5v3H6v-7z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
+                                <circle cx="40" cy="26" r="3" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
+                                <path d="M22 28.5c4 0 8 1 14 3.5v3.5H22v-7z" fill="#FFFFFF" stroke="#E6E2DC" strokeWidth="0.8" />
+                                <ellipse cx="14" cy="27" rx="2.2" ry="1.2" fill="#37474F" stroke="#263238" strokeWidth="0.5" />
+                                <ellipse cx="19.5" cy="26.5" rx="2.5" ry="1.2" fill="#37474F" stroke="#263238" strokeWidth="0.5" />
+                                <ellipse cx="25" cy="27" rx="2.2" ry="1.2" fill="#37474F" stroke="#263238" strokeWidth="0.5" />
+                                <path d="M12 14c1 1.5 2 3.5 1.2 5.5M18 13c1 1.5 2 3.5 1.2 5.5" stroke="#C4A47C" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+                                <path d="M29 11l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z" fill="#FFF176" />
                               </svg>
                             )}
                           </div>
@@ -1003,7 +1217,8 @@ export default function OnlineBooking() {
                 <input 
                   type="text" 
                   value={birthDate}
-                  onChange={e => setBirthDate(e.target.value)}
+                  onChange={handleBirthDateChange}
+                  onBlur={handleBirthDateBlur}
                   placeholder="DD/MM/AAAA"
                   required
                   className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
