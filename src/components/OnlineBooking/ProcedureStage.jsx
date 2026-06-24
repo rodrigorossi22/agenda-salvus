@@ -9,7 +9,7 @@ const PROCEDURES = [
     feegowId: 346,
     professionalId: '15', // Monica
     professionalName: 'Monica Sousa',
-    displayDuration: '60'
+    displayDuration: '50'
   },
   {
     id: 'eletroestimulacao',
@@ -46,10 +46,10 @@ const PROCEDURES = [
     name: 'Massagem Facial',
     description: 'Alívio de tensões e relaxamento profundo.',
     category: 'Reset Mental',
-    feegowId: 55, // Assumindo o ID histórico 55 ou recém criado na Feegow
+    feegowId: 355,
     professionalId: '15', // Monica
     professionalName: 'Monica Sousa',
-    displayDuration: '60'
+    displayDuration: '50'
   }
 ]
 
