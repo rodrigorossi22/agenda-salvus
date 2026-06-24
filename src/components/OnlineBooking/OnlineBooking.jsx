@@ -52,6 +52,7 @@ function normalizeName(name) {
 export default function OnlineBooking() {
   const [stage, setStage] = useState(STAGES.WELCOME)
   const [selectedProcedure, setSelectedProcedure] = useState(null)
+  const [lastSelectedProcedureId, setLastSelectedProcedureId] = useState(null)
   const [isFirstTime, setIsFirstTime] = useState(true)
   const [email, setEmail] = useState('')
   const [birthDate, setBirthDate] = useState('')
@@ -341,7 +342,10 @@ export default function OnlineBooking() {
 
     const dateKey = format(selectedDate, 'yyyy-MM-dd')
     const dateStr = format(selectedDate, 'dd-MM-yyyy')
-    const durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
+    let durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
+    if (durationMinutes % 10 === 1) {
+      durationMinutes -= 1
+    }
 
 
     // Se ultrapassou o limite (semanal ou mensal), não exibe nenhum slot
@@ -443,7 +447,10 @@ export default function OnlineBooking() {
         // Filter slots based on professional availability rules
         const hasValidSlot = slots.some(time => {
           const slotStart = timeToMinutes(time)
-          const durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
+          let durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
+          if (durationMinutes % 10 === 1) {
+            durationMinutes -= 1
+          }
           const slotEnd = slotStart + durationMinutes
 
           const CLINIC_END_TIME = 20 * 60 + 30; // 1230 minutos (20:30h)
@@ -668,21 +675,16 @@ export default function OnlineBooking() {
     return datesWithSlots
   }, [datesWithSlots, selectedDate])
 
-  // Auto-select first date that actually has slots when slots are loaded or selectedDate becomes invalid
+  // Auto-select first date that actually has slots only when selected procedure changes (initial load)
   useEffect(() => {
     if (datesWithSlots.length > 0) {
-      if (!selectedDate || isNaN(selectedDate.getTime())) {
+      const procId = selectedProcedure?.feegowId || selectedProcedure?.id
+      if (procId !== lastSelectedProcedureId) {
         setSelectedDate(datesWithSlots[0])
-        return
-      }
-      const hasSlotsForSelected = datesWithSlots.some(
-        day => !isNaN(day.getTime()) && format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
-      )
-      if (!hasSlotsForSelected) {
-        setSelectedDate(datesWithSlots[0])
+        setLastSelectedProcedureId(procId)
       }
     }
-  }, [datesWithSlots, selectedDate])
+  }, [datesWithSlots, selectedProcedure, lastSelectedProcedureId])
 
   const handleCalendarDateSelect = (date) => {
     const isHeadSpa = selectedProcedure?.id === 'head-spa'
