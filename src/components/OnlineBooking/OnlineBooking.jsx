@@ -342,10 +342,7 @@ export default function OnlineBooking() {
 
     const dateKey = format(selectedDate, 'yyyy-MM-dd')
     const dateStr = format(selectedDate, 'dd-MM-yyyy')
-    let durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
-    if (durationMinutes % 10 === 1) {
-      durationMinutes -= 1
-    }
+    const durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
 
 
     // Se ultrapassou o limite (semanal ou mensal), não exibe nenhum slot
@@ -363,7 +360,8 @@ export default function OnlineBooking() {
           const slotEnd = slotStart + durationMinutes
 
           const CLINIC_END_TIME = 20 * 60 + 30; // 1230 minutos (20:30h)
-          const fitsHours = slotEnd <= CLINIC_END_TIME
+          const CLINIC_END_TIME_TOLERANCE = 1; // 1 minuto de tolerância
+          const fitsHours = slotEnd <= (CLINIC_END_TIME + CLINIC_END_TIME_TOLERANCE)
           
           if (!fitsHours) return false
 
@@ -447,14 +445,12 @@ export default function OnlineBooking() {
         // Filter slots based on professional availability rules
         const hasValidSlot = slots.some(time => {
           const slotStart = timeToMinutes(time)
-          let durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
-          if (durationMinutes % 10 === 1) {
-            durationMinutes -= 1
-          }
+          const durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
           const slotEnd = slotStart + durationMinutes
 
           const CLINIC_END_TIME = 20 * 60 + 30; // 1230 minutos (20:30h)
-          return slotEnd <= CLINIC_END_TIME
+          const CLINIC_END_TIME_TOLERANCE = 1; // 1 minuto de tolerância
+          return slotEnd <= (CLINIC_END_TIME + CLINIC_END_TIME_TOLERANCE)
         })
 
         // Converte a chave da data para verificar limites preventivamente
