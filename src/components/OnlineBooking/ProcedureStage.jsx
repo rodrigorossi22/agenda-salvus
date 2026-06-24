@@ -8,63 +8,53 @@ const PROCEDURES = [
     category: 'Recuperação',
     feegowId: 346,
     professionalId: '15', // Monica
-    professionalName: 'Monica Sousa'
+    professionalName: 'Monica Sousa',
+    displayDuration: '60'
   },
   {
     id: 'eletroestimulacao',
     name: 'Eletroestimulação',
-    description: 'Estímlos para regeneração muscular.',
+    description: 'Estímulos para regeneração muscular.',
     category: 'Recuperação',
     feegowId: 347,
     professionalId: '15', // Monica
-    professionalName: 'Monica Sousa'
+    professionalName: 'Monica Sousa',
+    displayDuration: '50'
+  },
+  {
+    id: 'corrente-russa',
+    name: 'Corrente Russa',
+    description: 'Estímulos focados no alívio de dores agudas',
+    category: 'Recuperação',
+    feegowId: 354, // "Corrente Russa Gympass"
+    professionalId: '15', // Monica
+    professionalName: 'Monica Sousa',
+    displayDuration: '50'
   },
   {
     id: 'shape-detox',
     name: 'Shape Detox',
-    description: 'Protocolo para eliminar toxinas.',
+    description: 'A evolução da Drenagem Linfática. Protocolo profundo focado em eliminar toxinas, inchaço e retenção de líquidos.',
     category: 'Desintoxicação',
     feegowId: 338,
     professionalId: '15', // Monica
-    professionalName: 'Monica Sousa'
+    professionalName: 'Monica Sousa',
+    displayDuration: '60'
   },
   {
-    id: 'drenagem-linfatica',
-    name: 'Drenagem Linfática',
-    description: 'Redução de inchaço e retenção.',
-    category: 'Desintoxicação',
-    feegowId: 339,
-    professionalId: '15', // Monica
-    professionalName: 'Monica Sousa'
-  },
-  {
-    id: 'head-spa',
-    name: 'Head Spa',
-    description: 'Terapia capilar relaxante.',
+    id: 'massagem-facial',
+    name: 'Massagem Facial',
+    description: 'Alívio de tensões e relaxamento profundo.',
     category: 'Reset Mental',
-    feegowId: 348,
-    professionalId: '16', // Raquel
-    professionalName: 'Raquel Nina'
-  },
-  {
-    id: 'massagem-relaxante',
-    name: 'Massagem Relaxante',
-    description: 'Alívio de estresse e tensões.',
-    category: 'Reset Mental',
-    feegowId: 349,
+    feegowId: 55, // Assumindo o ID histórico 55 ou recém criado na Feegow
     professionalId: '15', // Monica
-    professionalName: 'Monica Sousa'
+    professionalName: 'Monica Sousa',
+    displayDuration: '60'
   }
 ]
 
 export default function ProcedureStage({ onSelectProcedure, onBack }) {
   const categories = ['Recuperação', 'Desintoxicação', 'Reset Mental']
-
-  const getCategoryFooter = (category) => {
-    const categoryProcs = PROCEDURES.filter(p => p.category === category)
-    const uniqueProfs = [...new Set(categoryProcs.map(p => p.professionalName))]
-    return `${categoryProcs.length} procedimento${categoryProcs.length > 1 ? 's' : ''} • com ${uniqueProfs.join(', ')}`
-  }
 
   return (
     <div className="w-full max-w-6xl px-4">
@@ -138,6 +128,12 @@ export default function ProcedureStage({ onSelectProcedure, onBack }) {
                               <path d="M10 24l2 1.5-2 1.5 2 1.5M38 24l-2 1.5 2 1.5-2 1.5" stroke="#00E5FF" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                             </svg>
                           )}
+                          {proc.id === 'corrente-russa' && (
+                            <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M16 28l4-8h8l-2 4h4l-6 10v-6h-8z" fill="#C4A47C" opacity="0.8"/>
+                              <circle cx="24" cy="24" r="20" stroke="#E6E2DC" strokeWidth="1.5" fill="none" />
+                            </svg>
+                          )}
                           {proc.id === 'shape-detox' && (
                             <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <path d="M17 6c1.5 4 1 12 0 24s1.5 12 3.5 12c1 0 2-1 3-6h1c1 5 2 6 3 6c2 0 3.5-12 3.5-12s-1.5-20 0-24c-2 0-3 3-7 3s-5-3-7-3z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
@@ -148,41 +144,13 @@ export default function ProcedureStage({ onSelectProcedure, onBack }) {
                               <path d="M36.5 12.5c-.5-1-1.5-1-1.5-1s0 1.2 1 1.5c.6.2.7.2.7.2s-.1-.2-.2-.7z" fill="#FFFFFF" />
                             </svg>
                           )}
-                          {proc.id === 'drenagem-linfatica' && (
+
+                          {proc.id === 'massagem-facial' && (
                             <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <rect x="4" y="34" width="40" height="5" rx="1" fill="#F5F4F0" stroke="#E6E2DC" strokeWidth="0.8" />
-                              <path d="M6 28c6-2 15-3 22-1s12 3 14 5v3H6v-7z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                              <circle cx="40" cy="26" r="3" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                              <path d="M22 28.5c4 0 8 1 14 3.5v3.5H22v-7z" fill="#FFFFFF" stroke="#E6E2DC" strokeWidth="0.8" />
-                              <path d="M11 15c2-3.5 5-5 8-5s6 2.5 6 6l-1 8h-12l-1-9z" fill="#3F51B5" stroke="#303F9F" strokeWidth="0.8" />
-                              <circle cx="19" cy="7.5" r="3" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                              <path d="M14 21c1.5 2 3.5 5 4.5 7M23 21c-1.5 2-3 5-4 7" stroke="#F5D6C6" strokeWidth="2" strokeLinecap="round" />
-                              <path d="M26 25.5c2-1 4-1 6-.5M27 27.5c1.5-.7 3-.7 4.5-.3" stroke="#C4A47C" strokeWidth="0.8" strokeLinecap="round" fill="none" />
-                            </svg>
-                          )}
-                          {proc.id === 'head-spa' && (
-                            <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M6 34c4-1.5 12-2 20-2s16 .5 20 2v5H6v-5z" fill="#FAF9F6" stroke="#E6E2DC" strokeWidth="0.8" />
-                              <path d="M16 29c2-3.5 6-5 9-5s6 2 8 5" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                              <path d="M22 24.5c-2-3.5-5-5-9.5-5s-8 3-8 7c0 4 3.5 7.5 8.5 7.5" fill="#5D4037" />
-                              <path d="M22 17c1 1.5 2 2.5 1.5 4M27 16.5c0 1.5 1 2.5.5 4" stroke="#F5D6C6" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-                              <path d="M15 3h18v2H15V3z" fill="#7A7065" />
-                              <path d="M12 5h24l-3 4H15l-3-4z" fill="#C4A47C" stroke="#B5966d" strokeWidth="0.8" />
-                              <path d="M16 9l-3 9M21 9v11M27 9v11M32 9l3-8" stroke="#FFF59D" strokeWidth="1" strokeLinecap="round" strokeDasharray="2 2" />
-                              <path d="M13 9c2 3 5 6 9 8M35 9c-2 3-5 6-9 8" fill="none" stroke="#FFF176" strokeWidth="0.8" opacity="0.4" />
-                            </svg>
-                          )}
-                          {proc.id === 'massagem-relaxante' && (
-                            <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <rect x="4" y="34" width="40" height="5" rx="1" fill="#F5F4F0" stroke="#E6E2DC" strokeWidth="0.8" />
-                              <path d="M6 28c6-2 15-3 22-1s12 3 14 5v3H6v-7z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                              <circle cx="40" cy="26" r="3" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
-                              <path d="M22 28.5c4 0 8 1 14 3.5v3.5H22v-7z" fill="#FFFFFF" stroke="#E6E2DC" strokeWidth="0.8" />
-                              <ellipse cx="14" cy="27" rx="2.2" ry="1.2" fill="#37474F" stroke="#263238" strokeWidth="0.5" />
-                              <ellipse cx="19.5" cy="26.5" rx="2.5" ry="1.2" fill="#37474F" stroke="#263238" strokeWidth="0.5" />
-                              <ellipse cx="25" cy="27" rx="2.2" ry="1.2" fill="#37474F" stroke="#263238" strokeWidth="0.5" />
-                              <path d="M12 14c1 1.5 2 3.5 1.2 5.5M18 13c1 1.5 2 3.5 1.2 5.5" stroke="#C4A47C" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-                              <path d="M29 11l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z" fill="#FFF176" />
+                              <circle cx="24" cy="24" r="14" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="1"/>
+                              <path d="M18 22c1-1 3-1 4 0M26 22c1-1 3-1 4 0" stroke="#C4A47C" strokeWidth="1.5" strokeLinecap="round"/>
+                              <path d="M22 30c1 1 3 1 4 0" stroke="#C4A47C" strokeWidth="1.5" strokeLinecap="round"/>
+                              <path d="M10 18c2-4 6-6 8-4M38 18c-2-4-6-6-8-4" stroke="#E6E2DC" strokeWidth="2" strokeLinecap="round"/>
                             </svg>
                           )}
                         </div>
@@ -193,7 +161,7 @@ export default function ProcedureStage({ onSelectProcedure, onBack }) {
                               {proc.name}
                             </h4>
                             <span className="text-[10px] bg-white border border-[#e6e2dc] text-[#7a7065] px-2 py-0.5 rounded-full whitespace-nowrap">
-                              60 min
+                              {proc.displayDuration} min
                             </span>
                           </div>
                           <p className="text-xs text-[#7a7065] mt-1.5 leading-relaxed">
@@ -214,10 +182,6 @@ export default function ProcedureStage({ onSelectProcedure, onBack }) {
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="border-t border-[#e6e2dc] pt-4 text-[11px] text-[#7a7065] font-serif italic text-center">
-                {getCategoryFooter(category)}
               </div>
             </div>
           )

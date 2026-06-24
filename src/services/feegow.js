@@ -54,7 +54,7 @@ export async function fetchPatient(paciente_id) {
   return data.content ?? null
 }
 
-export async function fetchAppointments(dateStart, dateEnd = dateStart, paciente_id = null) {
+export async function fetchAppointments(dateStart, dateEnd = dateStart, paciente_id = null, includeCancelled = false) {
   const query = { data_start: dateStart, data_end: dateEnd }
   if (paciente_id) {
     query.paciente_id = String(paciente_id)
@@ -64,7 +64,7 @@ export async function fetchAppointments(dateStart, dateEnd = dateStart, paciente
   const rawAppointments = data.content ?? data ?? []
 
   const appointments = rawAppointments.filter(
-    (a) => ![11, 12, 13, 14, 21].includes(a.status_id)
+    (a) => includeCancelled ? true : ![11, 12, 13, 14, 21].includes(a.status_id)
   )
 
   const uniqueIds = [...new Set(appointments.map((a) => a.paciente_id).filter(Boolean))]
