@@ -365,6 +365,13 @@ export default function OnlineBooking() {
           
           if (!fitsHours) return false
 
+          // Bloqueio pontual temporário do Shape Detox (338) em 13/07/2026 a partir de 17:30
+          if (dateKey === '2026-07-13' && Number(selectedProcedure?.feegowId) === 338) {
+            if (slotStart >= timeToMinutes('17:30:00')) {
+              return false;
+            }
+          }
+
           const hasCollision = appointmentsForSelectedDate.some(appt => {
             const apptStart = timeToMinutes(appt.horario)
             const apptDuration = Number(appt.duracao) || 60
@@ -450,7 +457,16 @@ export default function OnlineBooking() {
 
           const CLINIC_END_TIME = 20 * 60 + 30; // 1230 minutos (20:30h)
           const CLINIC_END_TIME_TOLERANCE = 1; // 1 minuto de tolerância
-          return slotEnd <= (CLINIC_END_TIME + CLINIC_END_TIME_TOLERANCE)
+          const fitsHours = slotEnd <= (CLINIC_END_TIME + CLINIC_END_TIME_TOLERANCE)
+          if (!fitsHours) return false
+
+          // Bloqueio pontual temporário do Shape Detox (338) em 13/07/2026 a partir de 17:30
+          if (dateKey === '2026-07-13' && Number(selectedProcedure?.feegowId) === 338) {
+            if (slotStart >= timeToMinutes('17:30:00')) {
+              return false;
+            }
+          }
+          return true
         })
 
         // Converte a chave da data para verificar limites preventivamente
