@@ -7,8 +7,7 @@ const PROCEDURES = [
     description: 'Sucção contra dor e inflamação.',
     category: 'Recuperação',
     feegowId: 346,
-    professionalId: '15', // Monica
-    professionalName: 'Monica Sousa',
+    professionalIds: ['16', '15'], // Esteticista first, then Monica
     displayDuration: '50'
   },
   {
@@ -17,8 +16,7 @@ const PROCEDURES = [
     description: 'Estímulos para regeneração muscular.',
     category: 'Recuperação',
     feegowId: 347,
-    professionalId: '15', // Monica
-    professionalName: 'Monica Sousa',
+    professionalIds: ['16', '15'],
     displayDuration: '50'
   },
   {
@@ -26,9 +24,8 @@ const PROCEDURES = [
     name: 'Corrente Russa',
     description: 'Estímulos focados no alívio de dores agudas',
     category: 'Recuperação',
-    feegowId: 354, // "Corrente Russa Gympass"
-    professionalId: '15', // Monica
-    professionalName: 'Monica Sousa',
+    feegowId: 354,
+    professionalIds: ['16', '15'],
     displayDuration: '50'
   },
   {
@@ -37,9 +34,17 @@ const PROCEDURES = [
     description: 'A evolução da Drenagem Linfática. Protocolo profundo focado em eliminar toxinas, inchaço e retenção de líquidos.',
     category: 'Desintoxicação',
     feegowId: 338,
-    professionalId: '15', // Monica
-    professionalName: 'Monica Sousa',
+    professionalIds: ['16', '15'],
     displayDuration: '60'
+  },
+  {
+    id: 'drenagem',
+    name: 'Drenagem',
+    description: 'Drenagem clássica para ativação do sistema linfático, eliminação de líquidos e toxinas.',
+    category: 'Desintoxicação',
+    feegowId: 339,
+    professionalIds: ['16'], // Apenas Esteticista
+    displayDuration: '50'
   },
   {
     id: 'massagem-facial',
@@ -47,8 +52,16 @@ const PROCEDURES = [
     description: 'Alívio de tensões e relaxamento profundo.',
     category: 'Reset Mental',
     feegowId: 355,
-    professionalId: '15', // Monica
-    professionalName: 'Monica Sousa',
+    professionalIds: ['16', '15'],
+    displayDuration: '50'
+  },
+  {
+    id: 'massagem',
+    name: 'Massagem Relaxante',
+    description: 'Massagem corporal relaxante para alívio de tensões e relaxamento profundo.',
+    category: 'Reset Mental',
+    feegowId: 349,
+    professionalIds: ['16'], // Apenas Esteticista
     displayDuration: '50'
   }
 ]
@@ -144,7 +157,12 @@ export default function ProcedureStage({ onSelectProcedure, onBack }) {
                               <path d="M36.5 12.5c-.5-1-1.5-1-1.5-1s0 1.2 1 1.5c.6.2.7.2.7.2s-.1-.2-.2-.7z" fill="#FFFFFF" />
                             </svg>
                           )}
-
+                          {proc.id === 'drenagem' && (
+                            <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="24" cy="24" r="20" stroke="#E6E2DC" strokeWidth="1.2" fill="none" />
+                              <path d="M14 20c4-3 10-3 20 0M14 28c4-3 10-3 20 0" stroke="#C4A47C" strokeWidth="1.2" strokeLinecap="round"/>
+                            </svg>
+                          )}
                           {proc.id === 'massagem-facial' && (
                             <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <circle cx="24" cy="24" r="14" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="1"/>
@@ -153,6 +171,16 @@ export default function ProcedureStage({ onSelectProcedure, onBack }) {
                               <path d="M10 18c2-4 6-6 8-4M38 18c-2-4-6-6-8-4" stroke="#E6E2DC" strokeWidth="2" strokeLinecap="round"/>
                             </svg>
                           )}
+                           {proc.id === 'massagem' && (
+                             <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                               <circle cx="24" cy="24" r="20" stroke="#E6E2DC" strokeWidth="0.8" fill="none" />
+                               <path d="M4 34c4-2 12-4 20-4s18 2 22 4v6H4v-6z" fill="#F5D6C6" stroke="#E0B29B" strokeWidth="0.8" />
+                               <path d="M14 22c2-2 6-4 10-4s8 2 10 4" stroke="#C4A47C" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="2 2" />
+                               <path d="M24 17c-2 0-3.5 3-3.5 4.5 0 1.5 1.5 2 3.5 2s3.5-.5 3.5-2c0-1.5-1.5-4.5-3.5-4.5z" fill="#E6CFA3" fillOpacity="0.6" stroke="#C4A47C" strokeWidth="0.8" />
+                               <path d="M21 21.5c-1.5-.7-3 0-3 1.5 0 1 .8 1.5 3 .7" fill="#E6CFA3" fillOpacity="0.4" stroke="#C4A47C" strokeWidth="0.8" />
+                               <path d="M27 21.5c1.5-.7 3 0 3 1.5 0 1-.8 1.5-3 .7" fill="#E6CFA3" fillOpacity="0.4" stroke="#C4A47C" strokeWidth="0.8" />
+                             </svg>
+                           )}
                         </div>
 
                         <div className="flex-1">
@@ -170,8 +198,7 @@ export default function ProcedureStage({ onSelectProcedure, onBack }) {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between w-full mt-4 pt-2.5 border-t border-[#f2efeb] text-[10px] text-[#a29382]">
-                        <span>Por: {proc.professionalName}</span>
+                      <div className="flex items-center justify-end w-full mt-4 pt-2.5 border-t border-[#f2efeb] text-[10px] text-[#a29382]">
                         <span className="text-[#c5a059] font-semibold flex items-center gap-0.5">
                           Selecionar
                           <svg className="w-3 h-3 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

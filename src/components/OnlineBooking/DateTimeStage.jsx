@@ -26,7 +26,7 @@ export default function DateTimeStage({
     if (dateInputRef.current) {
       try {
         dateInputRef.current.showPicker()
-      } catch (err) {
+      } catch {
         dateInputRef.current.click()
       }
     }
@@ -46,7 +46,6 @@ export default function DateTimeStage({
       <header className="mb-8 text-center">
         <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Agendamento Online</span>
         <h2 className="text-4xl font-serif mt-2 text-[#2e2a25]">{selectedProcedure?.name || 'Agenda Recovery e Bem-estar'}</h2>
-        <p className="text-sm text-[#7a7065] mt-2">Profissional: {selectedProcedure?.professionalName || 'Monica Sousa'}</p>
       </header>
 
       {/* Test Mode Notification Banners */}
@@ -55,7 +54,7 @@ export default function DateTimeStage({
           <div>
             <p className="font-semibold">⚠️ Sem horários cadastrados</p>
             <p className="text-xs mt-1 text-[#9e826c]">
-              A profissional {selectedProcedure?.professionalName || 'Monica Sousa'} (ID {selectedProcedure?.professionalId}) não possui horários ativos no Feegow. 
+              Não foram encontrados horários ativos na Feegow para este procedimento. 
               Para testar o fluxo de agendamento localmente, clique no botão ao lado para carregar a agenda de teste (Dr. Deangelo ID 1).
             </p>
           </div>
@@ -81,7 +80,7 @@ export default function DateTimeStage({
             }}
             className="text-[#5c7a40] hover:underline font-bold ml-2 whitespace-nowrap cursor-pointer"
           >
-            Restaurar {selectedProcedure?.professionalName || 'Monica Sousa'}
+            Restaurar Agenda
           </button>
         </div>
       )}
@@ -188,7 +187,7 @@ export default function DateTimeStage({
                       {scarcitySlotsForDate.morning.map(time => (
                         <button
                           key={time}
-                          onClick={() => onSelectTime(time, scarcitySlotsForDate.localId)}
+                          onClick={() => onSelectTime(time, scarcitySlotsForDate.slotLocals?.[time] || scarcitySlotsForDate.localId)}
                           className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
                         >
                           {time.substring(0, 5)}
@@ -208,7 +207,7 @@ export default function DateTimeStage({
                       {scarcitySlotsForDate.afternoon.map(time => (
                         <button
                           key={time}
-                          onClick={() => onSelectTime(time, scarcitySlotsForDate.localId)}
+                          onClick={() => onSelectTime(time, scarcitySlotsForDate.slotLocals?.[time] || scarcitySlotsForDate.localId)}
                           className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
                         >
                           {time.substring(0, 5)}
@@ -228,7 +227,7 @@ export default function DateTimeStage({
                       {scarcitySlotsForDate.evening.map(time => (
                         <button
                           key={time}
-                          onClick={() => onSelectTime(time, scarcitySlotsForDate.localId)}
+                          onClick={() => onSelectTime(time, scarcitySlotsForDate.slotLocals?.[time] || scarcitySlotsForDate.localId)}
                           className="bg-white hover:bg-[#c5a059] border border-[#e6e2dc] hover:border-[#c5a059] text-[#2e2a25] hover:text-white font-medium py-3 rounded-lg text-sm text-center transition-all duration-200 shadow-sm cursor-pointer"
                         >
                           {time.substring(0, 5)}

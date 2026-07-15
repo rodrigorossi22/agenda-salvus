@@ -90,7 +90,7 @@ export default function OnlineBooking() {
   const [appointmentDetails, setAppointmentDetails] = useState(null)
 
   // Custom active professional derived from test mode or selected procedure
-  const activeProfessionalId = isTestMode ? '1' : (selectedProcedure?.professionalId || '15')
+  const activeProfessionalId = isTestMode ? '1' : (selectedProcedure?.professionalIds?.[0] || '15')
 
   const handlePhoneChange = (val) => {
     const newVal = typeof val === 'string' ? val : val.target.value
@@ -264,23 +264,64 @@ export default function OnlineBooking() {
       const futureStr = format(finalEnd, 'dd-MM-yyyy')
       
       const targetProcId = isTestMode ? 338 : (selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id)
+      const targetProfIds = isTestMode ? ['1'] : (selectedProcedure?.professionalIds || ['15'])
       
-      const [data, appts] = await Promise.all([
+      // Fetch all appointments for the date range once
+      const allAppts = await fetchAppointments(todayStr, futureStr, null, false)
+      
+      // Filter appointments to include only the active professionals we are scheduling for
+      const filteredAppts = allAppts.filter(a => targetProfIds.includes(String(a.profissional_id)))
+      setProfessionalAppointmentsRange(filteredAppts)
+      
+      // Fetch schedule for each professional in parallel
+      const schedulePromises = targetProfIds.map(profId => 
         fetchAvailableSchedule({
           procedimento_id: targetProcId,
           data_start: todayStr,
           data_end: futureStr,
-          profissional_id: activeProfessionalId
-        }),
-        fetchAppointments(todayStr, futureStr, null, false)
-      ])
+          profissional_id: profId
+        }).catch(err => {
+          console.error(`Erro ao carregar agenda do profissional ${profId}:`, err)
+          return null
+        })
+      )
       
-      const filteredAppts = appts.filter(a => String(a.profissional_id) === String(activeProfessionalId))
-      setProfessionalAppointmentsRange(filteredAppts)
+      const scheduleResults = await Promise.all(schedulePromises)
       
-      // Nesting resolution: content.profissional_id[activeProfessionalId].local_id
-      const localMap = data.profissional_id?.[activeProfessionalId]?.local_id || {}
-      setAvailableSlots(localMap)
+      // Merge slots
+      // Structure: { localId: { dateKey: { timeStr: profId } } }
+      const mergedSlots = {}
+      
+      // TargetProfIds are ordered by priority (e.g. ['16', '15']). 
+      // We loop in reverse order so that higher priority professionals overwrite and take precedence.
+      const reversedProfIds = [...targetProfIds].reverse()
+      
+      reversedProfIds.forEach(profId => {
+        const originalIndex = targetProfIds.indexOf(profId)
+        const data = scheduleResults[originalIndex]
+        if (!data) return
+        
+        const localMap = data.profissional_id?.[profId]?.local_id || {}
+        Object.keys(localMap).forEach(localId => {
+          if (!mergedSlots[localId]) {
+            mergedSlots[localId] = {}
+          }
+          
+          const dateMap = localMap[localId] || {}
+          Object.keys(dateMap).forEach(dateKey => {
+            if (!mergedSlots[localId][dateKey]) {
+              mergedSlots[localId][dateKey] = {}
+            }
+            
+            const times = dateMap[dateKey] || []
+            times.forEach(timeStr => {
+              mergedSlots[localId][dateKey][timeStr] = String(profId)
+            })
+          })
+        })
+      })
+      
+      setAvailableSlots(mergedSlots)
       setMaxFetchedDate(finalEnd)
     } catch (err) {
       console.error(err)
@@ -288,7 +329,7 @@ export default function OnlineBooking() {
     } finally {
       setLoadingSlots(false)
     }
-  }, [activeProfessionalId, selectedProcedure, isTestMode, selectedDate])
+  }, [selectedProcedure, isTestMode, selectedDate])
 
   // Load available slots when active professional or selected procedure changes, or stage changes to DATETIME, or selectedDate is beyond the fetched range
   useEffect(() => {
@@ -337,26 +378,33 @@ export default function OnlineBooking() {
     let afternoon = []
     let evening = []
     let foundLocalId = null
+    let slotLocals = {}
 
-    if (!selectedDate || isNaN(selectedDate.getTime()) || !availableSlots) return { morning, afternoon, evening, localId: foundLocalId }
+    if (!selectedDate || isNaN(selectedDate.getTime()) || !availableSlots) return { morning, afternoon, evening, localId: foundLocalId, slotLocals }
 
     const dateKey = format(selectedDate, 'yyyy-MM-dd')
     const dateStr = format(selectedDate, 'dd-MM-yyyy')
-    const durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
-
 
     // Se ultrapassou o limite (semanal ou mensal), não exibe nenhum slot
-    if (!isDateAllowed(selectedDate)) {
-      return { morning: [], afternoon: [], evening: [], localId: null }
+    const dateAllowed = isDateAllowed(selectedDate)
+    if (!dateAllowed) {
+      return { morning: [], afternoon: [], evening: [], localId: null, slotLocals: {} }
     }
 
-    for (const localId of Object.keys(availableSlots)) {
-      const dateSlots = availableSlots[localId]?.[dateKey] || []
-      if (dateSlots.length > 0) {
-        foundLocalId = localId
+    const candidates = []
 
-        const validSlots = dateSlots.filter(time => {
+    for (const localId of Object.keys(availableSlots)) {
+      const dateSlots = availableSlots[localId]?.[dateKey] || {}
+      const times = Object.keys(dateSlots).sort()
+      if (times.length > 0) {
+        const validSlots = times.filter(time => {
+          const slotProfId = String(dateSlots[time])
           const slotStart = timeToMinutes(time)
+          
+          let durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
+          if (slotProfId === '16' && Number(selectedProcedure?.feegowId) === 338) {
+            durationMinutes = 60
+          }
           const slotEnd = slotStart + durationMinutes
 
           const CLINIC_END_TIME = 20 * 60 + 30; // 1230 minutos (20:30h)
@@ -372,7 +420,15 @@ export default function OnlineBooking() {
             }
           }
 
-          const hasCollision = appointmentsForSelectedDate.some(appt => {
+          // Terça e Quinta apenas para a Esteticista
+          const dayOfWeek = selectedDate.getDay()
+          if (slotProfId === '16' && dayOfWeek !== 2 && dayOfWeek !== 4) {
+            return false
+          }
+
+          const collidingAppt = appointmentsForSelectedDate.find(appt => {
+            if (String(appt.profissional_id) !== slotProfId) return false
+            if ([11, 12, 14].includes(Number(appt.status_id))) return false
             const apptStart = timeToMinutes(appt.horario)
             const apptDuration = Number(appt.duracao) || 60
             const apptEnd = apptStart + apptDuration
@@ -381,7 +437,9 @@ export default function OnlineBooking() {
             return slotStart < apptEnd && slotEnd > apptStart
           })
 
-          return !hasCollision
+          if (collidingAppt) return false
+
+          return true
         })
 
         // Algoritmo de Slot Snapping (Encadeamento Matemático)
@@ -392,39 +450,84 @@ export default function OnlineBooking() {
           const slotStart = timeToMinutes(time)
           if (slotStart >= nextAvailableTime) {
             snappedSlots.push(time)
-            nextAvailableTime = slotStart + durationMinutes
+            
+            const slotProfId = String(dateSlots[time])
+            let slotDuration = procedureDurations[selectedProcedure?.feegowId] || 60
+            if (slotProfId === '16' && Number(selectedProcedure?.feegowId) === 338) {
+              slotDuration = 60
+            }
+            nextAvailableTime = slotStart + slotDuration
           }
         })
-
-        // Contagem de horários noturnos já agendados na Feegow naquele dia (Independente de Convênio)
-        const eveningAppointmentsCount = appointmentsForSelectedDate.filter(appt => {
-           return timeToMinutes(appt.horario) >= timeToMinutes('18:00:00')
-        }).length
-
-        const dayOfWeek = selectedDate.getDay()
-        const isRestrictedDay = (dayOfWeek === 2 || dayOfWeek === 4) // Terça ou Quinta
 
         snappedSlots.forEach(time => {
-          if (time < '12:00:00') {
-            morning.push(time)
-          } else if (time >= '12:00:00' && time < '18:00:00') {
-            afternoon.push(time)
-          } else {
-            if (isRestrictedDay) {
-               if (eveningAppointmentsCount >= 1) {
-                 // Bloqueio Total: A Mônica já tem paciente agendado após as 18h na Feegow, logo, não mostraremos nenhuma vaga noturna no Gympass.
-               } else if (evening.length < 1) {
-                 // Trava Visual (Abordagem B): Limita o paciente do Gympass a ver apenas 1 única vaga na tela.
-                 evening.push(time)
-               }
-            } else {
-               evening.push(time) // Dias normais, mostra tudo
-            }
-          }
+          candidates.push({
+            time,
+            localId,
+            profId: String(dateSlots[time])
+          })
         })
-        break; // Stop at first local that has slots for this date
       }
     }
+
+    const targetProfIds = isTestMode ? ['1'] : (selectedProcedure?.professionalIds || ['15'])
+    
+    // Sort by priority (higher priority professional first)
+    const prioritySorted = [...candidates].sort((a, b) => {
+      const prioA = targetProfIds.indexOf(a.profId)
+      const prioB = targetProfIds.indexOf(b.profId)
+      return prioA - prioB
+    })
+
+    // Deduplicate times
+    const uniqueCandidates = []
+    const seenTimes = new Set()
+    prioritySorted.forEach(cand => {
+      if (!seenTimes.has(cand.time)) {
+        seenTimes.add(cand.time)
+        uniqueCandidates.push(cand)
+      }
+    })
+
+    // Sort chronologically
+    uniqueCandidates.sort((a, b) => a.time.localeCompare(b.time))
+
+    // Contagem de horários noturnos da Monica
+    const eveningAppointmentsCount = appointmentsForSelectedDate.filter(appt => {
+       return String(appt.profissional_id) === '15' && timeToMinutes(appt.horario) >= timeToMinutes('18:00:00')
+    }).length
+
+    const dayOfWeek = selectedDate.getDay()
+    const isRestrictedDay = (dayOfWeek === 2 || dayOfWeek === 4)
+
+    uniqueCandidates.forEach(cand => {
+      const { time, localId, profId } = cand
+      slotLocals[time] = localId
+      if (!foundLocalId) {
+        foundLocalId = localId
+      }
+
+      if (time < '12:00:00') {
+        morning.push(time)
+      } else if (time >= '12:00:00' && time < '18:00:00') {
+        afternoon.push(time)
+      } else {
+        if (profId === '15' && isRestrictedDay) {
+           const monicaVisualEveningSlots = evening.filter(t => {
+             const slotLocal = slotLocals[t]
+             return availableSlots[slotLocal]?.[dateKey]?.[t] === '15'
+           }).length
+           
+           if (eveningAppointmentsCount >= 1) {
+             // Bloqueio Total
+           } else if (monicaVisualEveningSlots < 1) {
+             evening.push(time)
+           }
+        } else {
+           evening.push(time)
+        }
+      }
+    })
 
     // Pega os 3 primeiros horários encadeados de forma sequencial (Snapping)
     const limitedMorning = morning.slice(0, 3)
@@ -435,9 +538,10 @@ export default function OnlineBooking() {
       morning: limitedMorning,
       afternoon: limitedAfternoon,
       evening: limitedEvening,
-      localId: foundLocalId
+      localId: foundLocalId,
+      slotLocals
     }
-  }, [selectedDate, availableSlots, selectedProcedure, appointmentsForSelectedDate, procedureDurations, isDateAllowed])
+  }, [selectedDate, availableSlots, selectedProcedure, appointmentsForSelectedDate, procedureDurations, isDateAllowed, isTestMode])
 
   // Extract dates that actually have slots available for selected procedure
   const datesWithSlots = useMemo(() => {
@@ -447,12 +551,17 @@ export default function OnlineBooking() {
       const dateMap = availableSlots[localId] || {}
       for (const dateKey of Object.keys(dateMap)) {
         if (!dateKey || typeof dateKey !== 'string' || !dateKey.includes('-')) continue;
-        const slots = dateMap[dateKey] || []
+        const slotsMap = dateMap[dateKey] || {}
         
         // Filter slots based on professional availability rules
-        const hasValidSlot = slots.some(time => {
+        const hasValidSlot = Object.keys(slotsMap).some(time => {
+          const slotProfId = String(slotsMap[time])
           const slotStart = timeToMinutes(time)
-          const durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
+          
+          let durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
+          if (slotProfId === '16' && Number(selectedProcedure?.feegowId) === 338) {
+            durationMinutes = 60
+          }
           const slotEnd = slotStart + durationMinutes
 
           const CLINIC_END_TIME = 20 * 60 + 30; // 1230 minutos (20:30h)
@@ -466,10 +575,32 @@ export default function OnlineBooking() {
               return false;
             }
           }
-          return true
+
+          // Terça e Quinta apenas para a Esteticista
+          const [year, month, day] = dateKey.split('-').map(Number)
+          const dateToCheck = new Date(year, month - 1, day)
+          const dayOfWeek = dateToCheck.getDay()
+          if (slotProfId === '16' && dayOfWeek !== 2 && dayOfWeek !== 4) {
+            return false
+          }
+
+          // Collision check
+          const dateStr = format(dateToCheck, 'dd-MM-yyyy')
+          const appointmentsForSelectedDate = professionalAppointmentsRange.filter(appt => appt.data === dateStr)
+          
+          const hasCollision = appointmentsForSelectedDate.some(appt => {
+            if (String(appt.profissional_id) !== slotProfId) return false
+            if ([11, 12, 14].includes(Number(appt.status_id))) return false
+            const apptStart = timeToMinutes(appt.horario)
+            const apptDuration = Number(appt.duracao) || 60
+            const apptEnd = apptStart + apptDuration
+            return slotStart < apptEnd && slotEnd > apptStart
+          })
+
+          return !hasCollision
         })
 
-        // Converte a chave da data para verificar limites preventivamente
+        // Converte a data para verificar limites preventivamente
         const [year, month, day] = dateKey.split('-').map(Number)
         if (!year || isNaN(year)) continue;
         const dateToCheck = new Date(year, month - 1, day)
@@ -564,7 +695,13 @@ export default function OnlineBooking() {
         const formattedDate = format(selectedDate, 'dd-MM-yyyy')
 
         const targetProcId = isTestMode ? 338 : selectedProcedure?.feegowId
-        const targetProfId = isTestMode ? 1 : selectedProcedure?.professionalId
+        
+        const dateKeyForBook = format(selectedDate, 'yyyy-MM-dd')
+        const targetProfId = isTestMode 
+          ? 1 
+          : Number(availableSlots[selectedLocalId || scarcitySlotsForDate.localId]?.[dateKeyForBook]?.[selectedTime] || selectedProcedure?.professionalIds?.[0])
+
+        const profNameForNotes = targetProfId === 15 ? 'Monica Sousa' : (targetProfId === 16 ? 'Esteticista' : 'Freelancer')
 
         // Criar Agendamento
         await createAppointment({
@@ -573,7 +710,7 @@ export default function OnlineBooking() {
           procedimento_id: targetProcId,
           data: formattedDate,
           horario: selectedTime,
-          notas: `Agendamento automático via link online (${isTestMode ? 'Teste' : selectedProcedure?.professionalName}). Origem/UTM: ID ${getOrigemId()}.`,
+          notes: `Agendamento automático via link online (${isTestMode ? 'Teste' : profNameForNotes}). Origem/UTM: ID ${getOrigemId()}.`,
           profissional_id: targetProfId
         })
 
@@ -635,7 +772,13 @@ export default function OnlineBooking() {
       try {
         const formattedDate = format(selectedDate, 'dd-MM-yyyy')
         const targetProcId = isTestMode ? 338 : selectedProcedure?.feegowId
-        const targetProfId = isTestMode ? 1 : selectedProcedure?.professionalId
+        
+        const dateKeyForBook = format(selectedDate, 'yyyy-MM-dd')
+        const targetProfId = isTestMode 
+          ? 1 
+          : Number(availableSlots[selectedLocalId || scarcitySlotsForDate.localId]?.[dateKeyForBook]?.[selectedTime] || selectedProcedure?.professionalIds?.[0])
+
+        const profNameForNotes = targetProfId === 15 ? 'Monica Sousa' : (targetProfId === 16 ? 'Esteticista' : 'Freelancer')
 
         await createAppointment({
           local_id: selectedLocalId || scarcitySlotsForDate.localId,
@@ -643,7 +786,7 @@ export default function OnlineBooking() {
           procedimento_id: targetProcId,
           data: formattedDate,
           horario: selectedTime,
-          notas: `Agendamento automático via link online (${isTestMode ? 'Teste' : selectedProcedure?.professionalName}). Origem/UTM: ID ${getOrigemId()}.`,
+          notes: `Agendamento automático via link online (${isTestMode ? 'Teste' : profNameForNotes}). Origem/UTM: ID ${getOrigemId()}.`,
           profissional_id: targetProfId
         })
 
