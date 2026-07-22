@@ -66,8 +66,13 @@ const PROCEDURES = [
   }
 ]
 
-export default function ProcedureStage({ onSelectProcedure, onBack }) {
+export default function ProcedureStage({ onSelectProcedure, onBack, allowedProfIds = null, subtitle = null }) {
   const categories = ['Recuperação', 'Desintoxicação', 'Reset Mental']
+
+  const activeProcedures = React.useMemo(() => {
+    if (!allowedProfIds || allowedProfIds.length === 0) return PROCEDURES
+    return PROCEDURES.filter(p => p.professionalIds.some(profId => allowedProfIds.includes(profId)))
+  }, [allowedProfIds])
 
   return (
     <div className="w-full max-w-6xl px-4">
@@ -81,12 +86,15 @@ export default function ProcedureStage({ onSelectProcedure, onBack }) {
       <header className="mb-12 text-center">
         <span className="text-xs font-semibold uppercase tracking-widest text-[#c5a059]">Agendamento Online</span>
         <h2 className="text-4xl font-serif mt-2 text-[#2e2a25]">Escolha o seu Atendimento</h2>
-        <p className="text-sm text-[#7a7065] mt-2">Selecione uma categoria e o procedimento desejado para continuar</p>
+        <p className="text-sm text-[#7a7065] mt-2">
+          {subtitle || 'Selecione uma categoria e o procedimento desejado para continuar'}
+        </p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {categories.map((category) => {
-          const categoryProcs = PROCEDURES.filter((p) => p.category === category)
+          const categoryProcs = activeProcedures.filter((p) => p.category === category)
+          if (categoryProcs.length === 0) return null
 
           return (
             <div 

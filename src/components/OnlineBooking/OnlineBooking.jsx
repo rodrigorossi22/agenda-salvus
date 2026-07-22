@@ -7,6 +7,7 @@ import salvusLogo from '../../assets/logo_transparent.png'
 
 import WelcomeStage from './WelcomeStage'
 import IdentificationStage from './IdentificationStage'
+import FlowSelectionStage from './FlowSelectionStage'
 import ProcedureStage from './ProcedureStage'
 import DateTimeStage from './DateTimeStage'
 import FormStage from './FormStage'
@@ -22,6 +23,7 @@ const DEFAULT_PROCEDURE = {
 const STAGES = {
   WELCOME: 'WELCOME',
   IDENTIFICATION: 'IDENTIFICATION',
+  FLOW_SELECTION: 'FLOW_SELECTION',
   PROCEDURE: 'PROCEDURE',
   DATETIME: 'DATETIME',
   FORM: 'FORM',
@@ -61,6 +63,9 @@ const sendWhatsappConfirmation = (data) => {
 
 export default function OnlineBooking() {
   const [stage, setStage] = useState(STAGES.WELCOME)
+  const [flowMode, setFlowMode] = useState(null) // 'DATE_FIRST' | 'PROCEDURE_FIRST'
+  const [allowedProfIdsForTime, setAllowedProfIdsForTime] = useState(null)
+  const [timeSelectionSubtitle, setTimeSelectionSubtitle] = useState(null)
   const [selectedProcedure, setSelectedProcedure] = useState(null)
   const [lastSelectedProcedureId, setLastSelectedProcedureId] = useState(null)
   const [isFirstTime, setIsFirstTime] = useState(true)
@@ -304,7 +309,7 @@ export default function OnlineBooking() {
       const futureStr = format(finalEnd, 'dd-MM-yyyy')
       
       const targetProcId = isTestMode ? 338 : (selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id)
-      const targetProfIds = isTestMode ? ['1'] : (selectedProcedure?.professionalIds || ['15'])
+      const targetProfIds = isTestMode ? ['1'] : (selectedProcedure?.professionalIds || ['16', '15'])
       
       // Fetch all appointments for the date range once
       const allAppts = await fetchAppointments(todayStr, futureStr, null, false)
@@ -314,9 +319,13 @@ export default function OnlineBooking() {
       setProfessionalAppointmentsRange(filteredAppts)
       
       // Fetch schedule for each professional in parallel
-      const schedulePromises = targetProfIds.map(profId => 
-        fetchAvailableSchedule({
-          procedimento_id: targetProcId,
+      const schedulePromises = targetProfIds.map(profId => {
+        let fetchProcId = targetProcId
+        if (flowMode === 'DATE_FIRST' && !selectedProcedure) {
+          fetchProcId = String(profId) === '16' ? 339 : 338
+        }
+        return fetchAvailableSchedule({
+          procedimento_id: fetchProcId,
           data_start: todayStr,
           data_end: futureStr,
           profissional_id: profId
@@ -324,7 +333,7 @@ export default function OnlineBooking() {
           console.error(`Erro ao carregar agenda do profissional ${profId}:`, err)
           return null
         })
-      )
+      })
       
       const scheduleResults = await Promise.all(schedulePromises)
       
@@ -332,8 +341,6 @@ export default function OnlineBooking() {
       // Structure: { localId: { dateKey: { timeStr: profId } } }
       const mergedSlots = {}
       
-      // TargetProfIds are ordered by priority (e.g. ['16', '15']). 
-      // We loop in reverse order so that higher priority professionals overwrite and take precedence.
       const reversedProfIds = [...targetProfIds].reverse()
       
       reversedProfIds.forEach(profId => {
@@ -355,7 +362,14 @@ export default function OnlineBooking() {
             
             const times = dateMap[dateKey] || []
             times.forEach(timeStr => {
-              mergedSlots[localId][dateKey][timeStr] = String(profId)
+              const current = mergedSlots[localId][dateKey][timeStr]
+              if (current) {
+                if (!current.split(',').includes(String(profId))) {
+                  mergedSlots[localId][dateKey][timeStr] = `${current},${profId}`
+                }
+              } else {
+                mergedSlots[localId][dateKey][timeStr] = String(profId)
+              }
             })
           })
         })
@@ -369,16 +383,16 @@ export default function OnlineBooking() {
     } finally {
       setLoadingSlots(false)
     }
-  }, [selectedProcedure, isTestMode, selectedDate])
+  }, [selectedProcedure, isTestMode, selectedDate, flowMode])
 
-  // Load available slots when active professional or selected procedure changes, or stage changes to DATETIME, or selectedDate is beyond the fetched range
+  // Load available slots when stage changes to DATETIME, or selectedDate is beyond the fetched range
   useEffect(() => {
-    if (stage === STAGES.DATETIME && selectedProcedure) {
-      if (!maxFetchedDate || selectedDate.getTime() > maxFetchedDate.getTime()) {
+    if (stage === STAGES.DATETIME) {
+      if (!maxFetchedDate || selectedDate.getTime() > maxFetchedDate.getTime() || Object.keys(availableSlots).length === 0) {
         loadSlots()
       }
     }
-  }, [stage, selectedProcedure, selectedDate, maxFetchedDate, loadSlots])
+  }, [stage, selectedProcedure, selectedDate, maxFetchedDate, loadSlots, availableSlots])
 
   // Helper function to check if date is allowed under patient's weekly/monthly limits
   const isDateAllowed = useCallback((dateToCheck) => {
@@ -663,14 +677,117 @@ export default function OnlineBooking() {
 
   const handleProcedureSelect = (proc) => {
     setSelectedProcedure(proc)
-    setMaxFetchedDate(null)
-    setStage(STAGES.DATETIME)
+    setLastSelectedProcedureId(proc.id)
+
+    if (flowMode === 'DATE_FIRST' && selectedTime) {
+      if (!isFirstTime && foundPatientId) {
+        handleBookingDirect({ procOverride: proc })
+      } else {
+        setStage(STAGES.FORM)
+      }
+    } else {
+      setMaxFetchedDate(null)
+      setStage(STAGES.DATETIME)
+    }
   }
 
   const handleTimeSelect = (time, localId) => {
     setSelectedTime(time)
     setSelectedLocalId(localId)
-    setStage(STAGES.FORM)
+
+    if (flowMode === 'DATE_FIRST' && !selectedProcedure) {
+      const dateKey = format(selectedDate, 'yyyy-MM-dd')
+      const targetLocal = localId || scarcitySlotsForDate.localId
+      const profIdRaw = availableSlots[targetLocal]?.[dateKey]?.[time] || '16'
+      const profIdsAtTime = String(profIdRaw).split(',')
+
+      setAllowedProfIdsForTime(profIdsAtTime)
+
+      const formattedDateStr = format(selectedDate, 'dd/MM/yyyy')
+      setTimeSelectionSubtitle(`Tratamentos disponíveis para ${formattedDateStr} às ${time.substring(0, 5)}h:`)
+
+      setStage(STAGES.PROCEDURE)
+      return
+    }
+
+    if (!isFirstTime && foundPatientId) {
+      handleBookingDirect({ timeOverride: time, localIdOverride: localId })
+    } else {
+      setStage(STAGES.FORM)
+    }
+  }
+
+  const handleBookingDirect = async ({ timeOverride = null, localIdOverride = null, procOverride = null } = {}) => {
+    const bookingTime = timeOverride || selectedTime
+    const bookingLocalId = localIdOverride || selectedLocalId || scarcitySlotsForDate.localId
+    const bookingProc = procOverride || selectedProcedure
+
+    if (!bookingTime || !foundPatientId) return
+
+    setSubmitting(true)
+    setErrorMessage(null)
+
+    try {
+      const formattedDate = format(selectedDate, 'dd-MM-yyyy')
+      const targetProcId = isTestMode ? 338 : bookingProc?.feegowId
+
+      const dateKeyForBook = format(selectedDate, 'yyyy-MM-dd')
+      const rawProfStr = String(availableSlots[bookingLocalId]?.[dateKeyForBook]?.[bookingTime] || '')
+      const profIdsAtTime = rawProfStr.split(',')
+
+      let targetProfId = 15
+      if (bookingProc?.professionalIds) {
+        const matched = bookingProc.professionalIds.find(p => profIdsAtTime.includes(String(p)))
+        if (matched) {
+          targetProfId = Number(matched)
+        } else {
+          targetProfId = Number(bookingProc.professionalIds[0])
+        }
+      }
+      if (isTestMode) targetProfId = 1
+
+      const profNameForNotes = targetProfId === 15 ? 'Monica Sousa' : (targetProfId === 16 ? 'Esteticista' : 'Freelancer')
+
+      await createAppointment({
+        local_id: bookingLocalId,
+        paciente_id: foundPatientId,
+        procedimento_id: targetProcId,
+        data: formattedDate,
+        horario: bookingTime,
+        notes: `Agendamento automático via link online (${isTestMode ? 'Teste' : profNameForNotes}). Origem/UTM: ID ${getOrigemId()}.`,
+        profissional_id: targetProfId
+      })
+
+      sendWhatsappConfirmation({
+        nome: foundPatientName || name,
+        telefone: phone,
+        procedimentoName: bookingProc?.name || DEFAULT_PROCEDURE.name,
+        procedimentoId: targetProcId,
+        date: format(selectedDate, 'dd/MM/yyyy'),
+        time: bookingTime?.substring(0, 5) || ''
+      })
+
+      setAppointmentDetails({
+        procedureName: bookingProc?.name || DEFAULT_PROCEDURE.name,
+        date: format(selectedDate, 'dd/MM/yyyy'),
+        time: bookingTime?.substring(0, 5) || ''
+      })
+
+      setStage(STAGES.SUCCESS)
+    } catch (err) {
+      console.error(err)
+      const isFeegowError = err.message?.includes('Feegow')
+      setErrorMessage(
+        isFeegowError
+          ? err.message
+          : 'Este horário foi preenchido recentemente por outro paciente. Por favor, selecione outra vaga.'
+      )
+      if (!isFeegowError) {
+        loadSlots()
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleBooking = async (e) => {
@@ -968,7 +1085,7 @@ export default function OnlineBooking() {
                   setStage(STAGES.IDENTIFICATION)
                 } else {
                   setIsFirstTime(true)
-                  setStage(STAGES.PROCEDURE)
+                  setStage(STAGES.FLOW_SELECTION)
                 }
               }}
             />
@@ -991,19 +1108,44 @@ export default function OnlineBooking() {
                   setFoundPatientId(null)
                   setFoundPatientName('')
                 }
-                setStage(STAGES.PROCEDURE)
+                setStage(STAGES.FLOW_SELECTION)
+              }}
+            />
+          )}
+
+          {stage === STAGES.FLOW_SELECTION && (
+            <FlowSelectionStage
+              onSelectFlow={(mode) => {
+                setFlowMode(mode)
+                if (mode === 'DATE_FIRST') {
+                  setSelectedProcedure(null)
+                  setAllowedProfIdsForTime(null)
+                  setTimeSelectionSubtitle(null)
+                  setStage(STAGES.DATETIME)
+                } else {
+                  setStage(STAGES.PROCEDURE)
+                }
+              }}
+              onBack={() => {
+                if (!isFirstTime && foundPatientId) {
+                  setStage(STAGES.IDENTIFICATION)
+                } else {
+                  setStage(STAGES.WELCOME)
+                }
               }}
             />
           )}
 
           {stage === STAGES.PROCEDURE && (
             <ProcedureStage
+              allowedProfIds={flowMode === 'DATE_FIRST' ? allowedProfIdsForTime : null}
+              subtitle={flowMode === 'DATE_FIRST' ? timeSelectionSubtitle : null}
               onSelectProcedure={handleProcedureSelect}
               onBack={() => {
-                if (!isFirstTime && foundPatientId) {
-                  setStage(STAGES.IDENTIFICATION)
+                if (flowMode === 'DATE_FIRST' && selectedTime) {
+                  setStage(STAGES.DATETIME)
                 } else {
-                  setStage(STAGES.WELCOME)
+                  setStage(STAGES.FLOW_SELECTION)
                 }
               }}
             />
@@ -1033,7 +1175,7 @@ export default function OnlineBooking() {
               onBack={() => {
                 setSelectedProcedure(null)
                 setSelectedTime(null)
-                setStage(STAGES.PROCEDURE)
+                setStage(STAGES.FLOW_SELECTION)
               }}
             />
           )}
