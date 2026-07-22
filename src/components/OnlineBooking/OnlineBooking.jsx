@@ -50,7 +50,7 @@ function normalizeName(name) {
 }
 
 const sendWhatsappConfirmation = (data) => {
-  const webhookUrl = 'https://n8n.salvusmedicina.com.br/webhook/agendamento-online-confirmacao'
+  const webhookUrl = 'https://rossiatmz.com.br/n8n/webhook/agendamento-online-confirmacao'
   fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
