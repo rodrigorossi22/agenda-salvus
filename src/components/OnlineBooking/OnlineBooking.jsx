@@ -71,6 +71,7 @@ export default function OnlineBooking() {
   const [searchingPatient, setSearchingPatient] = useState(false)
   const [searchFailed, setSearchFailed] = useState(false)
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false)
+  const [waitlistTurno, setWaitlistTurno] = useState('qualquer')
   const [isVagaRelampago, setIsVagaRelampago] = useState(false)
 
   // Leitura dos parâmetros URL da Vaga Relâmpago (?date=DD-MM-YYYY&time=HH:mm)
@@ -1021,7 +1022,10 @@ export default function OnlineBooking() {
               onSelectDate={setSelectedDate}
               onSelectTime={handleTimeSelect}
               handleCalendarDateSelect={handleCalendarDateSelect}
-              onOpenWaitlistModal={() => setIsWaitlistModalOpen(true)}
+              onOpenWaitlistModal={(t = 'qualquer') => {
+                setWaitlistTurno(t)
+                setIsWaitlistModalOpen(true)
+              }}
               onBack={() => {
                 setSelectedProcedure(null)
                 setSelectedTime(null)
@@ -1083,6 +1087,10 @@ export default function OnlineBooking() {
         isOpen={isWaitlistModalOpen}
         onClose={() => setIsWaitlistModalOpen(false)}
         selectedDate={selectedDate}
+        initialTurno={waitlistTurno}
+        isFirstTime={isFirstTime}
+        patientPhone={phone}
+        patientName={foundPatientName || name}
       />
     </div>
   )

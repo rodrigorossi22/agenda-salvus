@@ -1,28 +1,52 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 
-export default function WaitlistModal({ isOpen, onClose, selectedDate }) {
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
+export default function WaitlistModal({ 
+  isOpen, 
+  onClose, 
+  selectedDate, 
+  initialTurno = 'qualquer',
+  isFirstTime = true, 
+  patientPhone = '', 
+  patientName = '' 
+}) {
+  const [name, setName] = useState(patientName || '')
+  const [phone, setPhone] = useState(patientPhone || '')
   const [dateStr, setDateStr] = useState(selectedDate ? format(selectedDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
-  const [turno, setTurno] = useState('qualquer')
+  const [turno, setTurno] = useState(initialTurno || 'qualquer')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState(null)
 
+  useEffect(() => {
+    if (isOpen) {
+      if (patientName) setName(patientName)
+      if (patientPhone) setPhone(patientPhone)
+      if (selectedDate) setDateStr(format(selectedDate, 'yyyy-MM-dd'))
+      if (initialTurno) setTurno(initialTurno)
+      setSuccess(false)
+      setError(null)
+    }
+  }, [isOpen, patientName, patientPhone, selectedDate, initialTurno])
+
   if (!isOpen) return null
+
+  const isExistingPatient = !isFirstTime && Boolean(patientName || patientPhone)
+  const firstName = (patientName || name).trim().split(' ')[0] || 'Paciente'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!name.trim() || !phone.trim() || !dateStr) {
+    const targetName = (name || patientName || '').trim()
+    const targetPhone = (phone || patientPhone || '').replace(/\D/g, '')
+
+    if (!targetName || !targetPhone || !dateStr) {
       setError('Por favor, preencha o seu nome, WhatsApp e a data desejada.')
       return
     }
 
-    const cleanPhone = phone.replace(/\D/g, '')
-    if (cleanPhone.length < 10) {
+    if (targetPhone.length < 10) {
       setError('Por favor, informe um número de WhatsApp válido com DDD.')
       return
     }
@@ -36,8 +60,8 @@ export default function WaitlistModal({ isOpen, onClose, selectedDate }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nome: name.trim(),
-          telefone: cleanPhone,
+          nome: targetName,
+          telefone: targetPhone,
           data_desejada: dateStr,
           turno
         })
@@ -76,9 +100,14 @@ export default function WaitlistModal({ isOpen, onClose, selectedDate }) {
             <>
               <div className="text-center mb-6">
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-[#c5a059]">Clínica Salvus</span>
-                <h3 className="text-2xl font-serif text-[#2e2a25] mt-1">Entrar na Fila de Espera ⚡</h3>
+                <h3 className="text-2xl font-serif text-[#2e2a25] mt-1">
+                  {isExistingPatient ? `Fila de Espera ⚡` : 'Entrar na Fila de Espera ⚡'}
+                </h3>
                 <p className="text-xs text-[#7a7065] mt-2 leading-relaxed">
-                  Se um horário vagar para o dia selecionado, avisaremos você instantaneamente pelo WhatsApp!
+                  {isExistingPatient 
+                    ? `Olá, ${firstName}! Confirmamos o seu cadastro para envio de notificação imediata assim que vagar um horário.`
+                    : 'Se um horário vagar para o dia e turno selecionados, avisaremos você instantaneamente pelo WhatsApp!'
+                  }
                 </p>
               </div>
 
@@ -89,23 +118,39 @@ export default function WaitlistModal({ isOpen, onClose, selectedDate }) {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#7a7065] mb-1">
-                    Seu Nome Completo
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="ex: Camila Silva"
-                    className="w-full px-4 py-2.5 bg-white border border-[#e6e2dc] rounded-lg text-sm text-[#2e2a25] focus:outline-none focus:border-[#c5a059]"
-                    required
-                  />
-                </div>
+                {/* Se NÃO for paciente existente, pede o nome completo */}
+                {!isExistingPatient && (
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#7a7065] mb-1">
+                      Seu Nome Completo
+                    </label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="ex: Camila Silva"
+                      className="w-full px-4 py-2.5 bg-white border border-[#e6e2dc] rounded-lg text-sm text-[#2e2a25] focus:outline-none focus:border-[#c5a059]"
+                      required
+                    />
+                  </div>
+                )}
+
+                {/* Se for paciente existente, exibe confirmação visual estilizada do nome */}
+                {isExistingPatient && (
+                  <div className="p-3 bg-[#f5f4f0] border border-[#e6e2dc] rounded-lg flex items-center justify-between text-xs text-[#524d46]">
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold text-[#c5a059] block">Paciente</span>
+                      <strong className="text-sm font-serif text-[#2e2a25]">{patientName || name}</strong>
+                    </div>
+                    <span className="text-xs text-[#5c7a40] font-semibold bg-[#ebf3e3] px-2 py-0.5 rounded border border-[#c6dcae]">
+                      ✓ Cadastrado(a)
+                    </span>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-[#7a7065] mb-1">
-                    Seu WhatsApp
+                    WhatsApp para Notificação
                   </label>
                   <input
                     type="tel"
@@ -152,7 +197,7 @@ export default function WaitlistModal({ isOpen, onClose, selectedDate }) {
                   disabled={submitting}
                   className="w-full mt-2 bg-[#c5a059] hover:bg-[#b08e4f] text-white font-bold py-3 px-6 rounded-lg uppercase tracking-widest text-xs transition-colors shadow-md cursor-pointer disabled:opacity-50"
                 >
-                  {submitting ? 'Registrando...' : 'Confirmar Inscrição na Fila'}
+                  {submitting ? 'Registrando...' : 'Confirmar na Fila de Espera ⚡'}
                 </button>
               </form>
             </>
@@ -163,11 +208,11 @@ export default function WaitlistModal({ isOpen, onClose, selectedDate }) {
               </div>
               <h3 className="text-xl font-serif text-[#2e2a25] font-semibold">Inscrição Confirmada!</h3>
               <p className="text-xs text-[#7a7065] mt-2 leading-relaxed">
-                Você foi cadastrado(a) com sucesso na nossa Fila de Espera para a data selecionada. Assim que surgir uma Vaga Relâmpago, avisaremos você direto pelo WhatsApp!
+                Você foi cadastrado(a) na Fila de Espera da Clínica Salvus. Assim que surgir uma Vaga Relâmpago para a data e turno selecionados, avisaremos você direto pelo WhatsApp!
               </p>
               <button
                 onClick={onClose}
-                className="mt-6 bg-[#c5a059] text-white font-bold py-2.5 px-6 rounded-lg text-xs tracking-wider uppercase"
+                className="mt-6 bg-[#c5a059] text-white font-bold py-2.5 px-6 rounded-lg text-xs tracking-wider uppercase cursor-pointer"
               >
                 Fechar
               </button>

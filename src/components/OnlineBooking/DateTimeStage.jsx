@@ -212,7 +212,15 @@ export default function DateTimeStage({
             <div>
               <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Manhã</h4>
               {scarcitySlotsForDate.morning.length === 0 ? (
-                <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da manhã.</p>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#faf9f6] border border-[#e6e2dc] p-3.5 rounded-xl gap-3">
+                  <p className="text-xs text-[#7a7065] italic">Sem horários livres no turno da manhã.</p>
+                  <button
+                    onClick={() => onOpenWaitlistModal('manha')}
+                    className="bg-[#c5a059] hover:bg-[#b08e4f] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+                  >
+                    Entrar na Fila (Manhã) ⚡
+                  </button>
+                </div>
               ) : (
                 <div className="grid grid-cols-3 gap-3">
                   {scarcitySlotsForDate.morning.map(time => (
@@ -232,7 +240,15 @@ export default function DateTimeStage({
             <div>
               <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Tarde</h4>
               {scarcitySlotsForDate.afternoon.length === 0 ? (
-                <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da tarde.</p>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#faf9f6] border border-[#e6e2dc] p-3.5 rounded-xl gap-3">
+                  <p className="text-xs text-[#7a7065] italic">Sem horários livres no turno da tarde.</p>
+                  <button
+                    onClick={() => onOpenWaitlistModal('tarde')}
+                    className="bg-[#c5a059] hover:bg-[#b08e4f] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+                  >
+                    Entrar na Fila (Tarde) ⚡
+                  </button>
+                </div>
               ) : (
                 <div className="grid grid-cols-3 gap-3">
                   {scarcitySlotsForDate.afternoon.map(time => (
@@ -252,7 +268,15 @@ export default function DateTimeStage({
             <div>
               <h4 className="text-sm font-medium text-[#7a7065] mb-3 border-b border-[#e6e2dc] pb-1">Noite</h4>
               {scarcitySlotsForDate.evening.length === 0 ? (
-                <p className="text-xs text-[#a29382] italic">Sem horários livres no turno da noite.</p>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#faf9f6] border border-[#e6e2dc] p-3.5 rounded-xl gap-3">
+                  <p className="text-xs text-[#7a7065] italic">Sem horários livres no turno da noite.</p>
+                  <button
+                    onClick={() => onOpenWaitlistModal('noite')}
+                    className="bg-[#c5a059] hover:bg-[#b08e4f] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+                  >
+                    Entrar na Fila (Noite) ⚡
+                  </button>
+                </div>
               ) : (
                 <div className="grid grid-cols-3 gap-3">
                   {scarcitySlotsForDate.evening.map(time => (
