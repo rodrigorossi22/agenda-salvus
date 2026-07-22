@@ -474,9 +474,9 @@ export default function OnlineBooking() {
             }
           }
 
-          // Terça e Quinta apenas para a Esteticista
+          // Terça, Quinta e Sexta para a Esteticista
           const dayOfWeek = selectedDate.getDay()
-          if (slotProfId === '16' && dayOfWeek !== 2 && dayOfWeek !== 4) {
+          if (slotProfId === '16' && dayOfWeek !== 2 && dayOfWeek !== 4 && dayOfWeek !== 5) {
             return false
           }
 
@@ -552,7 +552,7 @@ export default function OnlineBooking() {
     }).length
 
     const dayOfWeek = selectedDate.getDay()
-    const isRestrictedDay = (dayOfWeek === 2 || dayOfWeek === 4)
+    const isRestrictedDay = (dayOfWeek === 2 || dayOfWeek === 4 || dayOfWeek === 5)
 
     uniqueCandidates.forEach(cand => {
       const { time, localId, profId } = cand
@@ -630,11 +630,11 @@ export default function OnlineBooking() {
             }
           }
 
-          // Terça e Quinta apenas para a Esteticista
+          // Terça, Quinta e Sexta para a Esteticista
           const [year, month, day] = dateKey.split('-').map(Number)
           const dateToCheck = new Date(year, month - 1, day)
           const dayOfWeek = dateToCheck.getDay()
-          if (slotProfId === '16' && dayOfWeek !== 2 && dayOfWeek !== 4) {
+          if (slotProfId === '16' && dayOfWeek !== 2 && dayOfWeek !== 4 && dayOfWeek !== 5) {
             return false
           }
 
