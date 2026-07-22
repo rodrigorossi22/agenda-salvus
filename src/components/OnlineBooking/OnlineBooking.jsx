@@ -253,7 +253,11 @@ export default function OnlineBooking() {
         const map = {}
         list.forEach(p => {
           const id = p.id || p.procedimento_id
-          const time = Number(p.tempo) || 60
+          let time = Number(p.tempo) || 60
+          // Procedimentos estéticos corporais/agenda esteticista são cravados em exatamente 60 minutos
+          if ([338, 339, 346, 347, 349, 354, 355, 149].includes(Number(id))) {
+            time = 60
+          }
           if (id) {
             map[id] = time
           }
@@ -437,9 +441,9 @@ export default function OnlineBooking() {
           const slotProfId = String(dateSlots[time])
           const slotStart = timeToMinutes(time)
           
-          let durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
-          if (slotProfId === '16' && Number(selectedProcedure?.feegowId) === 338) {
-            durationMinutes = 60
+          let durationMinutes = 60
+          if (slotProfId !== '16' && ![338, 339, 346, 347, 349, 354, 355].includes(Number(selectedProcedure?.feegowId))) {
+            durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
           }
           const slotEnd = slotStart + durationMinutes
 
@@ -488,9 +492,9 @@ export default function OnlineBooking() {
             snappedSlots.push(time)
             
             const slotProfId = String(dateSlots[time])
-            let slotDuration = procedureDurations[selectedProcedure?.feegowId] || 60
-            if (slotProfId === '16' && Number(selectedProcedure?.feegowId) === 338) {
-              slotDuration = 60
+            let slotDuration = 60
+            if (slotProfId !== '16' && ![338, 339, 346, 347, 349, 354, 355].includes(Number(selectedProcedure?.feegowId))) {
+              slotDuration = procedureDurations[selectedProcedure?.feegowId] || 60
             }
             nextAvailableTime = slotStart + slotDuration
           }
