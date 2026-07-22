@@ -18,7 +18,8 @@ export default function DateTimeStage({
   onSelectDate,
   onSelectTime,
   onBack,
-  handleCalendarDateSelect
+  handleCalendarDateSelect,
+  onOpenWaitlistModal
 }) {
   const dateInputRef = useRef(null)
 
@@ -102,24 +103,40 @@ export default function DateTimeStage({
       {!loadingSlots && datesWithSlots.length === 0 ? (
         <div className="my-12 py-10 px-6 bg-[#faf9f6] border border-[#e6e2dc] rounded-2xl text-center max-w-xl mx-auto shadow-sm">
           <h3 className="text-2xl font-serif text-[#2e2a25] mb-4">Agenda Totalmente Preenchida</h3>
-          <p className="text-sm text-[#7a7065] mb-8 leading-relaxed">
+          <p className="text-sm text-[#7a7065] mb-6 leading-relaxed">
             Nossos horários online para este procedimento com {selectedProcedure?.professionalName || 'a profissional'} estão temporariamente esgotados nos próximos dias.
-            Para solicitar um horário de encaixe personalizado ou entrar na lista de espera, entre em contato direto com a nossa recepção via WhatsApp.
+            Deseja ser notificado(a) no WhatsApp assim que um horário vagar?
           </p>
-          <a 
-            href={import.meta.env.VITE_CLINIC_WHATSAPP || 'https://wa.me/5511999999999'} 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="inline-flex items-center justify-center bg-[#c5a059] hover:bg-[#b08e4f] text-white font-bold py-3.5 px-8 rounded-lg uppercase tracking-widest text-xs transition-colors shadow-md text-center cursor-pointer"
-          >
-            Solicitar Encaixe no WhatsApp
-          </a>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+            <button 
+              onClick={onOpenWaitlistModal}
+              className="inline-flex items-center justify-center bg-[#c5a059] hover:bg-[#b08e4f] text-white font-bold py-3.5 px-8 rounded-lg uppercase tracking-widest text-xs transition-colors shadow-md text-center cursor-pointer w-full sm:w-auto"
+            >
+              Entrar na Fila de Espera ⚡
+            </button>
+            <a 
+              href={import.meta.env.VITE_CLINIC_WHATSAPP || 'https://wa.me/5511999999999'} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="inline-flex items-center justify-center border border-[#c5a059] text-[#c5a059] hover:bg-[#c5a059]/10 font-semibold py-3.5 px-6 rounded-lg uppercase tracking-widest text-xs transition-colors text-center cursor-pointer w-full sm:w-auto"
+            >
+              Contato no WhatsApp
+            </a>
+          </div>
         </div>
       ) : (
         <>
           {/* Quick Date Selector tabs */}
           <div className="mb-8">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-3">1. Escolha o Dia</h3>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-[#7a7065]">1. Escolha o Dia</h3>
+              <button
+                onClick={onOpenWaitlistModal}
+                className="text-xs text-[#c5a059] font-semibold hover:underline cursor-pointer flex items-center gap-1"
+              >
+                Fila de Espera ⚡
+              </button>
+            </div>
             <div className="flex gap-2 items-center overflow-x-auto pb-3 scrollbar-thin">
               {weekdaysWithSelected.map((day, idx) => {
                 const isSelected = format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')

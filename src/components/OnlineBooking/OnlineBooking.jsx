@@ -11,6 +11,7 @@ import ProcedureStage from './ProcedureStage'
 import DateTimeStage from './DateTimeStage'
 import FormStage from './FormStage'
 import SuccessStage from './SuccessStage'
+import WaitlistModal from './WaitlistModal'
 
 const DEFAULT_PROCEDURE = {
   id: 149, // Outros (Consulta de Avaliação Estética) na Feegow
@@ -69,6 +70,31 @@ export default function OnlineBooking() {
   const [foundPatientId, setFoundPatientId] = useState(null)
   const [searchingPatient, setSearchingPatient] = useState(false)
   const [searchFailed, setSearchFailed] = useState(false)
+  const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false)
+  const [isVagaRelampago, setIsVagaRelampago] = useState(false)
+
+  // Leitura dos parâmetros URL da Vaga Relâmpago (?date=DD-MM-YYYY&time=HH:mm)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const dateParam = params.get('date')
+    const timeParam = params.get('time')
+
+    if (dateParam && timeParam) {
+      const parts = dateParam.split('-')
+      let parsedDate = null
+      if (parts[0].length === 4) {
+        parsedDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+      } else if (parts[2].length === 4) {
+        parsedDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]))
+      }
+      if (parsedDate && !isNaN(parsedDate.getTime())) {
+        setSelectedDate(parsedDate)
+        setSelectedTime(timeParam)
+        setIsVagaRelampago(true)
+        setStage(STAGES.PROCEDURE)
+      }
+    }
+  }, [])
 
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedTime, setSelectedTime] = useState(null)
@@ -995,6 +1021,7 @@ export default function OnlineBooking() {
               onSelectDate={setSelectedDate}
               onSelectTime={handleTimeSelect}
               handleCalendarDateSelect={handleCalendarDateSelect}
+              onOpenWaitlistModal={() => setIsWaitlistModalOpen(true)}
               onBack={() => {
                 setSelectedProcedure(null)
                 setSelectedTime(null)
@@ -1051,6 +1078,12 @@ export default function OnlineBooking() {
           )}
         </motion.div>
       </AnimatePresence>
+
+      <WaitlistModal 
+        isOpen={isWaitlistModalOpen}
+        onClose={() => setIsWaitlistModalOpen(false)}
+        selectedDate={selectedDate}
+      />
     </div>
   )
 }
