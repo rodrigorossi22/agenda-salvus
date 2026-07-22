@@ -65,6 +65,7 @@ export default function OnlineBooking() {
   const [stage, setStage] = useState(STAGES.WELCOME)
   const [flowMode, setFlowMode] = useState(null) // 'DATE_FIRST' | 'PROCEDURE_FIRST'
   const [allowedProfIdsForTime, setAllowedProfIdsForTime] = useState(null)
+  const [blockedProcedureIdsForTime, setBlockedProcedureIdsForTime] = useState(null)
   const [timeSelectionSubtitle, setTimeSelectionSubtitle] = useState(null)
   const [selectedProcedure, setSelectedProcedure] = useState(null)
   const [lastSelectedProcedureId, setLastSelectedProcedureId] = useState(null)
@@ -695,6 +696,40 @@ export default function OnlineBooking() {
     setSelectedTime(time)
     setSelectedLocalId(localId)
 
+    // Calcular equipamentos em uso na clínica inteira para o horário selecionado
+    const timeMin = timeToMinutes(time)
+    const overlappingAppts = appointmentsForSelectedDate.filter(appt => {
+      if ([11, 12, 14].includes(Number(appt.status_id))) return false
+      const apptStart = timeToMinutes(appt.horario)
+      const apptDur = Number(appt.duracao) || 60
+      const apptEnd = apptStart + apptDur
+      return timeMin >= apptStart && timeMin < apptEnd
+    })
+
+    const blockedIds = []
+
+    // Regra 1: Ventosaterapia (346) - Apenas 1 kit por horário na clínica
+    const hasVentosa = overlappingAppts.some(a => 
+      Number(a.procedimento_id) === 346 || 
+      String(a.procedimento_nome || '').toLowerCase().includes('ventosa')
+    )
+    if (hasVentosa) {
+      blockedIds.push(346)
+    }
+
+    // Regra 2: Eletroestimulação (347) & Corrente Russa (354) - Aparelho compartilhado único na clínica
+    const hasEletroOrCorrente = overlappingAppts.some(a => 
+      [347, 354].includes(Number(a.procedimento_id)) || 
+      String(a.procedimento_nome || '').toLowerCase().includes('eletro') || 
+      String(a.procedimento_nome || '').toLowerCase().includes('corrente')
+    )
+    if (hasEletroOrCorrente) {
+      blockedIds.push(347)
+      blockedIds.push(354)
+    }
+
+    setBlockedProcedureIdsForTime(blockedIds)
+
     if (flowMode === 'DATE_FIRST' && !selectedProcedure) {
       const dateKey = format(selectedDate, 'yyyy-MM-dd')
       const targetLocal = localId || scarcitySlotsForDate.localId
@@ -1139,6 +1174,7 @@ export default function OnlineBooking() {
           {stage === STAGES.PROCEDURE && (
             <ProcedureStage
               allowedProfIds={flowMode === 'DATE_FIRST' ? allowedProfIdsForTime : null}
+              blockedProcedureIds={blockedProcedureIdsForTime}
               subtitle={flowMode === 'DATE_FIRST' ? timeSelectionSubtitle : null}
               onSelectProcedure={handleProcedureSelect}
               onBack={() => {

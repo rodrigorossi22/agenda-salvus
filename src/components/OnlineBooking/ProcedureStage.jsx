@@ -66,13 +66,19 @@ const PROCEDURES = [
   }
 ]
 
-export default function ProcedureStage({ onSelectProcedure, onBack, allowedProfIds = null, subtitle = null }) {
+export default function ProcedureStage({ onSelectProcedure, onBack, allowedProfIds = null, blockedProcedureIds = null, subtitle = null }) {
   const categories = ['Recuperação', 'Desintoxicação', 'Reset Mental']
 
   const activeProcedures = React.useMemo(() => {
-    if (!allowedProfIds || allowedProfIds.length === 0) return PROCEDURES
-    return PROCEDURES.filter(p => p.professionalIds.some(profId => allowedProfIds.includes(profId)))
-  }, [allowedProfIds])
+    let list = PROCEDURES
+    if (allowedProfIds && allowedProfIds.length > 0) {
+      list = list.filter(p => p.professionalIds.some(profId => allowedProfIds.includes(profId)))
+    }
+    if (blockedProcedureIds && blockedProcedureIds.length > 0) {
+      list = list.filter(p => !blockedProcedureIds.includes(p.feegowId))
+    }
+    return list
+  }, [allowedProfIds, blockedProcedureIds])
 
   return (
     <div className="w-full max-w-6xl px-4">
