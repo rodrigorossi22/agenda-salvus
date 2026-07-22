@@ -16,9 +16,12 @@ export default function IdentificationStage({
     <div className="w-full max-w-md px-4 py-8">
       <button 
         onClick={onBack}
-        className="flex items-center text-xs text-[#7a7065] hover:text-[#c5a059] mb-6 transition-colors cursor-pointer"
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-[#c5a059]/40 text-[#2e2a25] hover:text-[#8c6d31] hover:border-[#c5a059] hover:bg-[#faf8f5] shadow-xs hover:shadow-md transition-all font-medium text-sm mb-6 cursor-pointer group"
       >
-        ← Voltar
+        <svg className="w-4 h-4 text-[#c5a059] group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+        </svg>
+        <span>Voltar</span>
       </button>
 
       <header className="mb-8 border-b border-[#e6e2dc] pb-4">
