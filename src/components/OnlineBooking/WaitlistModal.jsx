@@ -56,24 +56,35 @@ export default function WaitlistModal({
 
     try {
       const webhookUrl = 'https://rossiatmz.com.br/n8n/webhook/fila-espera-inscricao'
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nome: targetName,
-          telefone: targetPhone,
-          data_desejada: dateStr,
-          turno
-        })
-      })
+      const payload = {
+        nome: targetName,
+        telefone: targetPhone,
+        data_desejada: dateStr,
+        turno
+      }
 
-      if (!response.ok) {
-        throw new Error('Falha ao registrar na Fila de Espera.')
+      try {
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`)
+        }
+      } catch (fetchErr) {
+        console.warn('Tentando envio resiliente da fila de espera:', fetchErr)
+        await fetch(webhookUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
       }
 
       setSuccess(true)
     } catch (err) {
-      console.error(err)
+      console.error('Erro ao registrar na Fila de Espera:', err)
       setError('Não foi possível registrar seu nome na fila no momento. Tente novamente em instantes.')
     } finally {
       setSubmitting(false)
