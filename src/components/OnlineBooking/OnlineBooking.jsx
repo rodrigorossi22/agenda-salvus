@@ -49,6 +49,15 @@ function normalizeName(name) {
     .join(' ')
 }
 
+const sendWhatsappConfirmation = (data) => {
+  const webhookUrl = 'https://n8n.salvusmedicina.com.br/webhook/agendamento-online-confirmacao'
+  fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).catch((err) => console.error('Erro ao disparar notificação de confirmação WhatsApp:', err))
+}
+
 export default function OnlineBooking() {
   const [stage, setStage] = useState(STAGES.WELCOME)
   const [selectedProcedure, setSelectedProcedure] = useState(null)
@@ -714,6 +723,16 @@ export default function OnlineBooking() {
           profissional_id: targetProfId
         })
 
+        // Disparar notificação automática via WhatsApp no n8n (assíncrono)
+        sendWhatsappConfirmation({
+          nome: name,
+          telefone: phone,
+          procedimentoName: selectedProcedure?.name || DEFAULT_PROCEDURE.name,
+          procedimentoId: targetProcId,
+          date: format(selectedDate, 'dd/MM/yyyy'),
+          time: selectedTime?.substring(0, 5) || ''
+        })
+
         setAppointmentDetails({
           procedureName: selectedProcedure?.name || DEFAULT_PROCEDURE.name,
           date: format(selectedDate, 'dd/MM/yyyy'),
@@ -788,6 +807,16 @@ export default function OnlineBooking() {
           horario: selectedTime,
           notes: `Agendamento automático via link online (${isTestMode ? 'Teste' : profNameForNotes}). Origem/UTM: ID ${getOrigemId()}.`,
           profissional_id: targetProfId
+        })
+
+        // Disparar notificação automática via WhatsApp no n8n (assíncrono)
+        sendWhatsappConfirmation({
+          nome: foundPatientName || name,
+          telefone: phone,
+          procedimentoName: selectedProcedure?.name || DEFAULT_PROCEDURE.name,
+          procedimentoId: targetProcId,
+          date: format(selectedDate, 'dd/MM/yyyy'),
+          time: selectedTime?.substring(0, 5) || ''
         })
 
         setAppointmentDetails({
