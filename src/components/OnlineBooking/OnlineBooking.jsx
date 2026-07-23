@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, addDays, startOfWeek } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchAvailableSchedule, searchPatient, createPatient, createAppointment, fetchProcedures, fetchAppointments } from '../../services/feegow'
