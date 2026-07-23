@@ -113,18 +113,22 @@ export function ServiceMenu({ onSelectBooking, whatsappNumber = '5521971661665' 
       outros: []
     }
 
+    const EXCLUDED_KEYWORDS = [
+      'laser', 'gympass', 'principia', 'classpass', 'class pass', 'sabonete',
+      'retorno', 'teleconsulta', 'cbd', 'crio', 'ultrassonografia', 'bioplastia',
+      '1 ui', 'lavieen', 'tirzepatida', 'semaglutida', 'enfermagem', 'locação',
+      'locacao', 'whey', 'modelo', 'mentoria', 'rino', 'fotos', 'medidas',
+      'crédito', 'credito', 'implante', 'corticoide', 'pilates', 'bota de compress',
+      'preenchimento corporal', 'maesteron', 'masteron', 'vitamina b1', 'botox',
+      'cynthia', 'cyntyia', 'noda', 'soroterapia mitocondrial', 'soroterapia otimiz',
+      'protetor solar'
+    ]
+
     procedures.forEach((proc) => {
       const nomeLower = (proc.nome || '').toLowerCase()
       
-      // Filtrar e remover procedimentos de laser, gympass, principia, classpass e sabonetes a pedido do cliente
-      if (
-        nomeLower.includes('laser') || 
-        nomeLower.includes('gympass') || 
-        nomeLower.includes('principia') || 
-        nomeLower.includes('classpass') ||
-        nomeLower.includes('class pass') ||
-        nomeLower.includes('sabonete')
-      ) {
+      // Filtrar e remover procedimentos excluídos pelo cliente
+      if (EXCLUDED_KEYWORDS.some((kw) => nomeLower.includes(kw))) {
         return
       }
 
