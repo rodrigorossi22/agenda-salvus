@@ -170,7 +170,7 @@ export function ServiceMenu({ onSelectBooking, whatsappNumber = '5521971661665' 
             <div className="hidden sm:block h-8 w-px bg-[#C4A47C]/40" />
             <div className="hidden sm:block">
               <span className="text-[10px] uppercase tracking-widest text-[#C4A47C] font-semibold block">
-                Tabela Oficial Feegow
+                Tabela Oficial
               </span>
               <h1 className="text-xl font-serif text-[#2E2A25] font-medium leading-tight">
                 Menu de Serviços & Valores
@@ -227,7 +227,7 @@ export function ServiceMenu({ onSelectBooking, whatsappNumber = '5521971661665' 
           Catálogo Exclusivo de Procedimentos
         </h2>
         <p className="text-sm md:text-base text-[#7A7065] mt-3 max-w-2xl mx-auto leading-relaxed">
-          Transparência e excelência em saúde. Todos os valores são sincronizados em tempo real com o sistema Feegow da clínica.
+          Transparência e excelência em saúde.
         </p>
 
         {/* Filtro de Categorias */}
@@ -463,7 +463,7 @@ export function ServiceMenu({ onSelectBooking, whatsappNumber = '5521971661665' 
             <img src={salvusLogo} alt="Salvus" className="h-8 object-contain" />
             <span className="font-serif text-[#2E2A25] font-medium">Clínica Salvus</span>
           </div>
-          <p>© {new Date().getFullYear()} Clínica Salvus. Todos os direitos reservados. Valores integrados à Feegow API.</p>
+          <p>© {new Date().getFullYear()} Clínica Salvus. Todos os direitos reservados.</p>
         </div>
       </footer>
     </div>
