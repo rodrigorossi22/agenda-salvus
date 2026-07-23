@@ -110,6 +110,7 @@ export default function OnlineBooking() {
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [isTestMode, setIsTestMode] = useState(false)
   const [maxFetchedDate, setMaxFetchedDate] = useState(null)
+  const hasAutoSelectedRef = useRef(false)
 
   const [procedureDurations, setProcedureDurations] = useState({})
   const [professionalAppointmentsRange, setProfessionalAppointmentsRange] = useState([])
@@ -246,10 +247,11 @@ export default function OnlineBooking() {
     }
   }, [queryParams])
 
-  // Reset maxFetchedDate when test mode status changes
+  // Reset maxFetchedDate e hasAutoSelectedRef quando modo de teste ou procedimento mudarem
   useEffect(() => {
     setMaxFetchedDate(null)
-  }, [isTestMode])
+    hasAutoSelectedRef.current = false
+  }, [isTestMode, selectedProcedure])
 
   // Load procedure durations from Feegow on mount
   useEffect(() => {
@@ -306,8 +308,8 @@ export default function OnlineBooking() {
       const today = new Date()
       const todayStr = format(today, 'dd-MM-yyyy')
       
-      // Janela inicial ultra-rápida de 14 dias (expande dinamicamente se o usuário avançar a data)
-      const standardLimit = addDays(today, 14)
+      // Janela inicial de 35 dias (cobre 5 semanas para navegabilidade instantânea em 0ms)
+      const standardLimit = addDays(today, 35)
       const endLimit = addDays(selectedDate, 10)
       const finalEnd = endLimit > standardLimit ? endLimit : standardLimit
       const futureStr = format(finalEnd, 'dd-MM-yyyy')
@@ -1064,17 +1066,18 @@ export default function OnlineBooking() {
     return datesWithSlots
   }, [datesWithSlots, selectedDate])
 
-  // Auto-select first date that actually has slots when current selected date has no slots or on initial load
+  // Auto-select first date that actually has slots ONLY on initial load if current date has no slots
   useEffect(() => {
-    if (datesWithSlots.length > 0) {
+    if (datesWithSlots.length > 0 && !hasAutoSelectedRef.current) {
       const isSelectedDateInSlots = datesWithSlots.some(
         d => format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
       )
       if (!isSelectedDateInSlots) {
         setSelectedDate(datesWithSlots[0])
       }
+      hasAutoSelectedRef.current = true
     }
-  }, [datesWithSlots, selectedDate])
+  }, [datesWithSlots])
 
   const handleCalendarDateSelect = (date) => {
     const isHeadSpa = selectedProcedure?.id === 'head-spa'
@@ -1224,7 +1227,10 @@ export default function OnlineBooking() {
               scarcitySlotsForDate={scarcitySlotsForDate}
               datesWithSlots={datesWithSlots}
               weekdaysWithSelected={weekdaysWithSelected}
-              onSelectDate={setSelectedDate}
+              onSelectDate={(date) => {
+                setSelectedDate(date)
+                setSelectedTime(null)
+              }}
               onSelectTime={handleTimeSelect}
               handleCalendarDateSelect={handleCalendarDateSelect}
               onOpenWaitlistModal={(t = 'qualquer') => {
