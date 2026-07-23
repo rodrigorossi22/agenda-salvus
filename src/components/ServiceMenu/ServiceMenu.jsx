@@ -115,7 +115,7 @@ export function ServiceMenu({ onSelectBooking, whatsappNumber = '5521971661665' 
 
     const EXCLUDED_KEYWORDS = [
       'laser', 'gympass', 'principia', 'classpass', 'class pass', 'sabonete',
-      'retorno', 'teleconsulta', 'cbd', 'crio', 'bioplastia', 'medicamento',
+      'retorno', 'reavaliação', 'reavaliacao', 'teleconsulta', 'cbd', 'crio', 'bioplastia', 'medicamento',
       '1 ui', 'lavieen', 'tirzepatida', 'semaglutida', 'enfermagem', 'locação',
       'locacao', 'whey', 'modelo', 'mentoria', 'rino', 'fotos', 'medidas',
       'crédito', 'credito', 'implante', 'corticoide', 'pilates', 'bota de compress',
