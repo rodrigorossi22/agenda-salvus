@@ -295,6 +295,9 @@ export default function OnlineBooking() {
     return 20 // Contato direto Whatsapp (padrão)
   }
 
+  // Cache em memória para evitar chamadas repetidas à Feegow
+  const slotsCacheRef = React.useRef({})
+
   // Load available slots function
   const loadSlots = useCallback(async () => {
     setLoadingSlots(true)
@@ -303,23 +306,33 @@ export default function OnlineBooking() {
       const today = new Date()
       const todayStr = format(today, 'dd-MM-yyyy')
       
-      // Fetch up to 30 days from today, or 14 days after selectedDate (whichever is later)
-      const standardLimit = addDays(today, 30)
-      const endLimit = addDays(selectedDate, 14)
+      // Janela inicial ultra-rápida de 14 dias (expande dinamicamente se o usuário avançar a data)
+      const standardLimit = addDays(today, 14)
+      const endLimit = addDays(selectedDate, 10)
       const finalEnd = endLimit > standardLimit ? endLimit : standardLimit
       const futureStr = format(finalEnd, 'dd-MM-yyyy')
       
       const targetProcId = isTestMode ? 338 : (selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id)
       const targetProfIds = isTestMode ? ['1'] : (selectedProcedure?.professionalIds || ['16', '15'])
+
+      const cacheKey = `${flowMode}_${targetProcId}_${todayStr}_${futureStr}_${isTestMode}`
+      const cached = slotsCacheRef.current[cacheKey]
       
-      // Fetch all appointments for the date range once
-      const allAppts = await fetchAppointments(todayStr, futureStr, null, false)
-      
-      // Filter appointments to include only the active professionals we are scheduling for
-      const filteredAppts = allAppts.filter(a => targetProfIds.includes(String(a.profissional_id)))
-      setProfessionalAppointmentsRange(filteredAppts)
-      
-      // Fetch schedule for each professional in parallel
+      // Se houver cache válido por menos de 3 minutos, carrega instantaneamente em 0ms
+      if (cached && (Date.now() - cached.timestamp < 180000)) {
+        setProfessionalAppointmentsRange(cached.filteredAppts)
+        setAvailableSlots(cached.mergedSlots)
+        setMaxFetchedDate(finalEnd)
+        setLoadingSlots(false)
+        return
+      }
+
+      // EXECUTAR TUDO EM PARALELO SIMULTÂNEO (SEM WATERFALL)
+      const apptsPromise = fetchAppointments(todayStr, futureStr, null, false).catch(err => {
+        console.error('Erro ao carregar agendamentos:', err)
+        return []
+      })
+
       const schedulePromises = targetProfIds.map(profId => {
         let fetchProcId = targetProcId
         if (flowMode === 'DATE_FIRST' && !selectedProcedure) {
@@ -335,13 +348,15 @@ export default function OnlineBooking() {
           return null
         })
       })
-      
-      const scheduleResults = await Promise.all(schedulePromises)
-      
+
+      // Aguarda todos os resultados simultaneamente
+      const [allAppts, ...scheduleResults] = await Promise.all([apptsPromise, ...schedulePromises])
+
+      const filteredAppts = (allAppts || []).filter(a => targetProfIds.includes(String(a.profissional_id)))
+      setProfessionalAppointmentsRange(filteredAppts)
+
       // Merge slots
-      // Structure: { localId: { dateKey: { timeStr: profId } } }
       const mergedSlots = {}
-      
       const reversedProfIds = [...targetProfIds].reverse()
       
       reversedProfIds.forEach(profId => {
@@ -375,7 +390,14 @@ export default function OnlineBooking() {
           })
         })
       })
-      
+
+      // Salva no cache em memória
+      slotsCacheRef.current[cacheKey] = {
+        filteredAppts,
+        mergedSlots,
+        timestamp: Date.now()
+      }
+
       setAvailableSlots(mergedSlots)
       setMaxFetchedDate(finalEnd)
     } catch (err) {
