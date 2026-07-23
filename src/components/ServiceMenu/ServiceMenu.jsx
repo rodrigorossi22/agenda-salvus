@@ -116,6 +116,11 @@ export function ServiceMenu({ onSelectBooking, whatsappNumber = '5521971661665' 
     procedures.forEach((proc) => {
       const nomeLower = (proc.nome || '').toLowerCase()
       
+      // Filtrar e remover procedimentos de laser/depilação a pedido do cliente
+      if (nomeLower.includes('laser')) {
+        return
+      }
+
       // Checar se bate com a busca
       if (searchTerm.trim() !== '') {
         const query = searchTerm.toLowerCase()
