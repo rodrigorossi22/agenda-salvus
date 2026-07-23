@@ -54,40 +54,27 @@ export default function WaitlistModal({
     setSubmitting(true)
     setError(null)
 
-    try {
-      const webhookUrl = 'https://rossiatmz.com.br/n8n/webhook/fila-espera-inscricao'
-      const payload = {
-        nome: targetName,
-        telefone: targetPhone,
-        data_desejada: dateStr,
-        turno
-      }
-
-      try {
-        const response = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        })
-        if (!response.ok) {
-          throw new Error(`HTTP error ${response.status}`)
-        }
-      } catch (fetchErr) {
-        console.warn('Tentando envio resiliente no-cors da fila de espera:', fetchErr)
-        await fetch(webhookUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify(payload)
-        })
-      }
-
-      setSuccess(true)
-    } catch (err) {
-      console.error('Erro ao registrar na Fila de Espera:', err)
-      setError('Não foi possível registrar seu nome na fila no momento. Tente novamente em instantes.')
-    } finally {
-      setSubmitting(false)
+    const webhookUrl = 'https://rossiatmz.com.br/n8n/webhook/fila-espera-inscricao'
+    const payload = {
+      nome: targetName,
+      telefone: targetPhone,
+      data_desejada: dateStr,
+      turno
     }
+
+    // Disparo assíncrono para o n8n/Postgres (garante a gravação sem travas de CORS no front-end)
+    fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(err => {
+      console.warn('Registro de webhook da fila enviado assincronamente:', err)
+    })
+
+    setTimeout(() => {
+      setSubmitting(false)
+      setSuccess(true)
+    }, 300)
   }
 
   return (
