@@ -73,11 +73,10 @@ export default function WaitlistModal({
           throw new Error(`HTTP error ${response.status}`)
         }
       } catch (fetchErr) {
-        console.warn('Tentando envio resiliente da fila de espera:', fetchErr)
+        console.warn('Tentando envio resiliente no-cors da fila de espera:', fetchErr)
         await fetch(webhookUrl, {
           method: 'POST',
           mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         })
       }
