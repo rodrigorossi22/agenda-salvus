@@ -318,8 +318,8 @@ export default function OnlineBooking() {
       const cacheKey = `${flowMode}_${targetProcId}_${todayStr}_${futureStr}_${isTestMode}`
       const cached = slotsCacheRef.current[cacheKey]
       
-      // Se houver cache válido por menos de 3 minutos, carrega instantaneamente em 0ms
-      if (cached && (Date.now() - cached.timestamp < 180000)) {
+      // Se houver cache válido por menos de 30 segundos, carrega instantaneamente em 0ms
+      if (cached && (Date.now() - cached.timestamp < 30000)) {
         setProfessionalAppointmentsRange(cached.filteredAppts)
         setAvailableSlots(cached.mergedSlots)
         setMaxFetchedDate(finalEnd)
