@@ -116,8 +116,13 @@ export function ServiceMenu({ onSelectBooking, whatsappNumber = '5521971661665' 
     procedures.forEach((proc) => {
       const nomeLower = (proc.nome || '').toLowerCase()
       
-      // Filtrar e remover procedimentos de laser e gympass a pedido do cliente
-      if (nomeLower.includes('laser') || nomeLower.includes('gympass')) {
+      // Filtrar e remover procedimentos de laser, gympass, principia e classpass a pedido do cliente
+      if (
+        nomeLower.includes('laser') || 
+        nomeLower.includes('gympass') || 
+        nomeLower.includes('principia') || 
+        nomeLower.includes('classpass')
+      ) {
         return
       }
 
