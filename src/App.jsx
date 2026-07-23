@@ -104,8 +104,18 @@ function App() {
             <h1 className="text-2xl font-bold">Agenda do Dia</h1>
             <p className="text-sm text-gray-500">{format(selectedDate, 'dd/MM/yyyy')}</p>
           </div>
-          <div className="rounded-full bg-[#c5a059]/10 px-4 py-1 text-sm font-bold text-[#c5a059]">
-            {visibleAppointments.length} agendamento{visibleAppointments.length !== 1 ? 's' : ''}
+          <div className="flex items-center gap-3">
+            <a
+              href="/menu"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-[#c5a059]/40 bg-[#c5a059]/10 px-4 py-1 text.xs font-bold text-[#c5a059] hover:bg-[#c5a059] hover:text-black transition-colors"
+            >
+              📋 Menu de Serviços & Valores
+            </a>
+            <div className="rounded-full bg-[#c5a059]/10 px-4 py-1 text-sm font-bold text-[#c5a059]">
+              {visibleAppointments.length} agendamento{visibleAppointments.length !== 1 ? 's' : ''}
+            </div>
           </div>
         </header>
 
