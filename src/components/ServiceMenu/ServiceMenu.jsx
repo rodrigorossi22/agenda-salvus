@@ -116,8 +116,8 @@ export function ServiceMenu({ onSelectBooking, whatsappNumber = '5521971661665' 
     procedures.forEach((proc) => {
       const nomeLower = (proc.nome || '').toLowerCase()
       
-      // Filtrar e remover procedimentos de laser/depilação a pedido do cliente
-      if (nomeLower.includes('laser')) {
+      // Filtrar e remover procedimentos de laser e gympass a pedido do cliente
+      if (nomeLower.includes('laser') || nomeLower.includes('gympass')) {
         return
       }
 
