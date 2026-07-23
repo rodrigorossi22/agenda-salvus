@@ -1064,16 +1064,17 @@ export default function OnlineBooking() {
     return datesWithSlots
   }, [datesWithSlots, selectedDate])
 
-  // Auto-select first date that actually has slots only when selected procedure changes (initial load)
+  // Auto-select first date that actually has slots when current selected date has no slots or on initial load
   useEffect(() => {
     if (datesWithSlots.length > 0) {
-      const procId = selectedProcedure?.feegowId || selectedProcedure?.id
-      if (procId !== lastSelectedProcedureId) {
+      const isSelectedDateInSlots = datesWithSlots.some(
+        d => format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
+      )
+      if (!isSelectedDateInSlots) {
         setSelectedDate(datesWithSlots[0])
-        setLastSelectedProcedureId(procId)
       }
     }
-  }, [datesWithSlots, selectedProcedure, lastSelectedProcedureId])
+  }, [datesWithSlots, selectedDate])
 
   const handleCalendarDateSelect = (date) => {
     const isHeadSpa = selectedProcedure?.id === 'head-spa'
