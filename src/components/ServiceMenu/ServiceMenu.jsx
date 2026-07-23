@@ -115,11 +115,11 @@ export function ServiceMenu({ onSelectBooking, whatsappNumber = '5521971661665' 
 
     const EXCLUDED_KEYWORDS = [
       'laser', 'gympass', 'principia', 'classpass', 'class pass', 'sabonete',
-      'retorno', 'teleconsulta', 'cbd', 'crio', 'ultrassonografia', 'bioplastia',
+      'retorno', 'teleconsulta', 'cbd', 'crio', 'bioplastia',
       '1 ui', 'lavieen', 'tirzepatida', 'semaglutida', 'enfermagem', 'locação',
       'locacao', 'whey', 'modelo', 'mentoria', 'rino', 'fotos', 'medidas',
       'crédito', 'credito', 'implante', 'corticoide', 'pilates', 'bota de compress',
-      'preenchimento corporal', 'maesteron', 'masteron', 'vitamina b1', 'botox',
+      'preenchimento corporal', 'maesteron', 'masteron', 'vitamina b1',
       'cynthia', 'cyntyia', 'noda', 'soroterapia mitocondrial', 'soroterapia otimiz',
       'protetor solar'
     ]
@@ -164,6 +164,11 @@ export function ServiceMenu({ onSelectBooking, whatsappNumber = '5521971661665' 
         description: meta.description,
         displayDuration: proc.tempo ? `${proc.tempo} min` : meta.duration
       })
+    })
+
+    // Agrupar e ordenar alfabeticamente para colocar procedimentos semelhantes juntos (ex: Botox, Ultrassom, Massagem, etc.)
+    Object.keys(result).forEach((catId) => {
+      result[catId].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'))
     })
 
     return result
