@@ -129,9 +129,6 @@ export async function createMedicalReport({ agendamento_id, laudo_base64 }) {
 }
 
 export async function searchPatient({ cpf, telefone }) {
-  const params = new URLSearchParams()
-  params.set('limit', '50')
-  params.set('offset', '0')
   const cleanCpf = cpf ? cpf.replace(/\D/g, '') : ''
   let cleanTelefone = telefone ? telefone.replace(/\D/g, '') : ''
 
@@ -141,21 +138,56 @@ export async function searchPatient({ cpf, telefone }) {
   }
 
   if (cleanCpf.length > 0) {
+    const params = new URLSearchParams()
+    params.set('limit', '50')
+    params.set('offset', '0')
     params.set('cpf', cleanCpf)
-  } else if (cleanTelefone.length > 0) {
-    params.set('telefone', cleanTelefone)
-  } else {
+    const data = await request(`/patient/list?${params}`)
+    const list = data.content || []
+    if (list.length > 0 && list[0].patient_id) {
+      return {
+        patient_id: list[0].patient_id,
+        nome: list[0].nome || ''
+      }
+    }
     return null
   }
 
-  const data = await request(`/patient/list?${params}`)
-  const list = data.content || []
-  if (list.length > 0 && list[0].patient_id) {
-    return {
-      patient_id: list[0].patient_id,
-      nome: list[0].nome || ''
+  if (cleanTelefone.length > 0) {
+    const phoneCandidates = [cleanTelefone]
+
+    if (cleanTelefone.length === 10) {
+      // Ex: 7192097748 (DDD + 8 dígitos) -> Adiciona o 9: 71992097748
+      const ddd = cleanTelefone.substring(0, 2)
+      const numberPart = cleanTelefone.substring(2)
+      phoneCandidates.push(`${ddd}9${numberPart}`)
+    } else if (cleanTelefone.length === 11 && cleanTelefone.charAt(2) === '9') {
+      // Ex: 71992097748 (DDD + 9 + 8 dígitos) -> Remove o 9 excedente: 7192097748
+      const ddd = cleanTelefone.substring(0, 2)
+      const numberPart = cleanTelefone.substring(3)
+      phoneCandidates.push(`${ddd}${numberPart}`)
+    }
+
+    for (const cand of phoneCandidates) {
+      const params = new URLSearchParams()
+      params.set('limit', '50')
+      params.set('offset', '0')
+      params.set('telefone', cand)
+      try {
+        const data = await request(`/patient/list?${params}`)
+        const list = data.content || []
+        if (list.length > 0 && list[0].patient_id) {
+          return {
+            patient_id: list[0].patient_id,
+            nome: list[0].nome || ''
+          }
+        }
+      } catch (err) {
+        console.error(`Erro ao buscar telefone candidato ${cand}:`, err)
+      }
     }
   }
+
   return null
 }
 
