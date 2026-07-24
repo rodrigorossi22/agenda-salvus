@@ -685,8 +685,8 @@ export default function OnlineBooking() {
         const dateToCheck = new Date(year, month - 1, day)
         if (isNaN(dateToCheck.getTime())) continue;
 
-        // Se todos os filtros passaram, a data tem slot
-        if (hasValidSlot && isDateAllowed(dateToCheck)) {
+        // Se tem slot válido fisicamente na Feegow, a data é marcada como disponível na régua
+        if (hasValidSlot) {
           dates.add(dateKey)
         }
       }
@@ -1052,7 +1052,9 @@ export default function OnlineBooking() {
 
   // Combined list of dates with slots plus the selected date if it's outside the list
   const weekdaysWithSelected = useMemo(() => {
-    if (datesWithSlots.length === 0) return []
+    if (!datesWithSlots || datesWithSlots.length === 0) {
+      return (selectedDate && !isNaN(selectedDate.getTime())) ? [selectedDate] : []
+    }
 
     if (!selectedDate || isNaN(selectedDate.getTime())) return datesWithSlots
 
