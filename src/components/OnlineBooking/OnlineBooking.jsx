@@ -1099,26 +1099,6 @@ export default function OnlineBooking() {
       return
     }
 
-    // Valida limites se o paciente já foi identificado
-    if (!isFirstTime && foundPatientId) {
-      const allowed = isDateAllowed(date)
-      if (!allowed) {
-        const checkYear = date.getFullYear()
-        const checkMonth = date.getMonth()
-        const monthlyCount = patientMonthlyAppointments.filter(appt => {
-          const [d, m, y] = appt.data.split('-').map(Number)
-          return (y === checkYear && (m - 1) === checkMonth)
-        }).length
-
-        if (monthlyCount >= 2) {
-          alert('Não há horários online disponíveis para este período. Por favor, entre em contato pelo WhatsApp para consultar encaixes na recepção.')
-        } else {
-          alert('A política da clínica permite apenas 1 agendamento por semana. Por favor, escolha outra data.')
-        }
-        return
-      }
-    }
-    
     setSelectedDate(date)
     setSelectedTime(null)
   }
