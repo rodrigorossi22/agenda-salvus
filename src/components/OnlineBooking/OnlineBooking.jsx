@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, addDays, startOfWeek } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
-import { fetchAvailableSchedule, searchPatient, createPatient, createAppointment, fetchProcedures, fetchAppointments } from '../../services/feegow'
+import { fetchAvailableSchedule, searchPatient, createPatient, createAppointment, fetchProcedures, fetchAppointments, updateAppointmentStatus } from '../../services/feegow'
 import salvusLogo from '../../assets/logo_transparent.png'
 
 import WelcomeStage from './WelcomeStage'
@@ -13,6 +13,7 @@ import DateTimeStage from './DateTimeStage'
 import FormStage from './FormStage'
 import SuccessStage from './SuccessStage'
 import WaitlistModal from './WaitlistModal'
+import MyAppointmentsStage from './MyAppointmentsStage'
 
 const DEFAULT_PROCEDURE = {
   id: 149, // Outros (Consulta de Avaliação Estética) na Feegow
@@ -27,7 +28,8 @@ const STAGES = {
   PROCEDURE: 'PROCEDURE',
   DATETIME: 'DATETIME',
   FORM: 'FORM',
-  SUCCESS: 'SUCCESS'
+  SUCCESS: 'SUCCESS',
+  MY_APPOINTMENTS: 'MY_APPOINTMENTS'
 }
 
 function timeToMinutes(timeStr) {
@@ -80,11 +82,29 @@ export default function OnlineBooking() {
   const [waitlistTurno, setWaitlistTurno] = useState('qualquer')
   const [isVagaRelampago, setIsVagaRelampago] = useState(false)
 
-  // Leitura dos parâmetros URL da Vaga Relâmpago (?date=DD-MM-YYYY&time=HH:mm)
+  // Leitura dos parâmetros URL da Vaga Relâmpago (?date=DD-MM-YYYY&time=HH:mm) e Meus Agendamentos (?my_appointments=1&phone=...)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const dateParam = params.get('date')
     const timeParam = params.get('time')
+    const myApptsParam = params.get('my_appointments')
+    const phoneParam = params.get('phone') || params.get('telefone')
+
+    if (myApptsParam === '1' || (phoneParam && !dateParam)) {
+      setStage(STAGES.MY_APPOINTMENTS)
+      if (phoneParam) {
+        setPhone(phoneParam)
+        searchPatient({ telefone: phoneParam }).then((res) => {
+          if (res && res.patient_id) {
+            setFoundPatientId(res.patient_id)
+            setFoundPatientName(res.nome)
+            loadPatientAppointmentsHistory(res.patient_id)
+            loadPatientActiveAppointments(res.patient_id)
+          }
+        }).catch(console.error)
+      }
+      return
+    }
 
     if (dateParam && timeParam) {
       const parts = dateParam.split('-')
@@ -101,7 +121,7 @@ export default function OnlineBooking() {
         setStage(STAGES.PROCEDURE)
       }
     }
-  }, [])
+  }, [loadPatientActiveAppointments, loadPatientAppointmentsHistory])
 
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedTime, setSelectedTime] = useState(null)
@@ -123,6 +143,10 @@ export default function OnlineBooking() {
 
   const [patientMonthlyAppointments, setPatientMonthlyAppointments] = useState([])
   const [loadingCpfHistory, setLoadingCpfHistory] = useState(false)
+
+  const [patientActiveAppointments, setPatientActiveAppointments] = useState([])
+  const [loadingActiveAppointments, setLoadingActiveAppointments] = useState(false)
+  const [cancelledLateThisSession, setCancelledLateThisSession] = useState(false)
 
   // Form fields
   const [name, setName] = useState('')
@@ -211,6 +235,64 @@ export default function OnlineBooking() {
     }
   }, [])
 
+  const loadPatientActiveAppointments = useCallback(async (patientId) => {
+    if (!patientId) return
+    setLoadingActiveAppointments(true)
+    try {
+      const today = new Date()
+      const dateStart = format(today, 'dd-MM-yyyy')
+      const futureLimit = addDays(today, 90)
+      const dateEnd = format(futureLimit, 'dd-MM-yyyy')
+
+      const appts = await fetchAppointments(dateStart, dateEnd, patientId, false)
+      const activeFuture = appts.filter((a) => ![11, 12, 14, 21].includes(Number(a.status_id)))
+      setPatientActiveAppointments(activeFuture)
+    } catch (err) {
+      console.error('Erro ao buscar agendamentos ativos:', err)
+    } finally {
+      setLoadingActiveAppointments(false)
+    }
+  }, [])
+
+  const handleCancelAppointment = async (appt) => {
+    if (!appt || !appt.agendamento_id) return
+    try {
+      let parsedDate = new Date()
+      if (appt.data && appt.horario) {
+        const [d, m, y] = appt.data.split('-').map(Number)
+        const [hh, mm] = appt.horario.split(':').map(Number)
+        parsedDate = new Date(y, m - 1, d, hh, mm)
+      }
+      const now = new Date()
+      const hoursDiff = (parsedDate.getTime() - now.getTime()) / (1000 * 60 * 60)
+      const isLateCancel = hoursDiff < 24
+
+      if (isLateCancel) {
+        setCancelledLateThisSession(true)
+      }
+
+      await updateAppointmentStatus({
+        agendamento_id: appt.agendamento_id,
+        status_id: 11,
+        obs: 'Cancelado pelo paciente via Web App'
+      })
+
+      if (foundPatientId) {
+        await loadPatientAppointmentsHistory(foundPatientId)
+        await loadPatientActiveAppointments(foundPatientId)
+      }
+
+      if (isLateCancel) {
+        alert('Agendamento cancelado com sucesso. Como a desmarcação ocorreu com menos de 24h de antecedência, novas marcações e Fila de Espera para esta semana estão bloqueadas. Você poderá agendar normalmente a partir da próxima semana!')
+      } else {
+        alert('Seu agendamento foi cancelado com sucesso!')
+      }
+    } catch (err) {
+      console.error('Erro ao cancelar agendamento:', err)
+      alert('Não foi possível cancelar o agendamento no momento. Por favor, tente novamente ou entre em contato pelo WhatsApp.')
+    }
+  }
+
   const handleSearchPatient = async () => {
     if (!phone.trim()) {
       setErrorMessage('Por favor, preencha o campo de celular.')
@@ -224,8 +306,9 @@ export default function OnlineBooking() {
       if (result && result.patient_id) {
         setFoundPatientId(result.patient_id)
         setFoundPatientName(result.nome)
-        // Carrega o histórico de consultas imediatamente
+        // Carrega o histórico de consultas e agendamentos ativos
         await loadPatientAppointmentsHistory(result.patient_id)
+        await loadPatientActiveAppointments(result.patient_id)
       } else {
         setSearchFailed(true)
       }
@@ -419,8 +502,18 @@ export default function OnlineBooking() {
     }
   }, [stage, selectedProcedure, selectedDate, maxFetchedDate, loadSlots, availableSlots])
 
-  // Helper function to check if date is allowed under patient's weekly/monthly limits
+  // Helper function to check if date is allowed under patient's weekly/monthly limits and late cancellation rules
   const isDateAllowed = useCallback((dateToCheck) => {
+    // 0. Bloqueio por cancelamento em cima da hora (<24h) na semana corrente
+    if (cancelledLateThisSession) {
+      const getStartOfWeek = (d) => startOfWeek(d, { weekStartsOn: 1 })
+      const todayWeekStartStr = format(getStartOfWeek(new Date()), 'yyyy-MM-dd')
+      const checkWeekStartStr = format(getStartOfWeek(dateToCheck), 'yyyy-MM-dd')
+      if (todayWeekStartStr === checkWeekStartStr) {
+        return false
+      }
+    }
+
     if (isFirstTime || !foundPatientId) return true
 
     const checkYear = dateToCheck.getFullYear()
@@ -449,7 +542,7 @@ export default function OnlineBooking() {
     if (hasWeeklyAppt) return false
 
     return true
-  }, [isFirstTime, foundPatientId, patientMonthlyAppointments])
+  }, [isFirstTime, foundPatientId, patientMonthlyAppointments, cancelledLateThisSession])
 
   // Filter slots based on the Date, apply professional constraint rules & prevent collision
   const scarcitySlotsForDate = useMemo(() => {
@@ -1123,7 +1216,10 @@ export default function OnlineBooking() {
           {stage === STAGES.WELCOME && (
             <WelcomeStage
               onSelectOption={(option) => {
-                if (option === 'PATIENT') {
+                if (option === 'MY_APPOINTMENTS') {
+                  setIsFirstTime(false)
+                  setStage(STAGES.MY_APPOINTMENTS)
+                } else if (option === 'PATIENT') {
                   setIsFirstTime(false)
                   setStage(STAGES.IDENTIFICATION)
                 } else {
@@ -1131,6 +1227,27 @@ export default function OnlineBooking() {
                   setStage(STAGES.FLOW_SELECTION)
                 }
               }}
+            />
+          )}
+
+          {stage === STAGES.MY_APPOINTMENTS && (
+            <MyAppointmentsStage
+              phone={phone}
+              onChangePhone={handlePhoneChange}
+              searchingPatient={searchingPatient}
+              foundPatientName={foundPatientName}
+              appointments={patientActiveAppointments}
+              loadingAppointments={loadingActiveAppointments}
+              onSearchPatient={handleSearchPatient}
+              onCancelAppointment={handleCancelAppointment}
+              onRescheduleAppointment={(appt) => {
+                setIsFirstTime(false)
+                setStage(STAGES.FLOW_SELECTION)
+              }}
+              onNewBooking={() => {
+                setStage(STAGES.FLOW_SELECTION)
+              }}
+              onBack={() => setStage(STAGES.WELCOME)}
             />
           )}
 

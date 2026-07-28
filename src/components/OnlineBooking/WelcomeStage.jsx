@@ -44,6 +44,22 @@ export default function WelcomeStage({ onSelectOption }) {
             Selecione o procedimento, escolha a data desejada e preencha sua ficha cadastral no final do processo.
           </p>
         </button>
+        <button
+          onClick={() => onSelectOption('MY_APPOINTMENTS')}
+          className="w-full text-left bg-[#faf9f6] hover:bg-[#c5a059]/10 border border-[#c5a059]/40 hover:border-[#c5a059] rounded-xl p-5 transition-all duration-300 group cursor-pointer shadow-sm flex flex-col justify-between"
+        >
+          <div className="flex justify-between items-center w-full">
+            <h3 className="font-semibold text-sm text-[#c5a059] group-hover:text-[#b08e4f] transition-colors flex items-center gap-2">
+              <span>📋</span> Consultar / Gerenciar Meus Agendamentos
+            </h3>
+            <svg className="w-4 h-4 text-[#c5a059] transform group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+          <p className="text-xs text-[#7a7065] mt-2 leading-relaxed">
+            Consulte seus horários marcados, veja detalhes, cancele ou solicite alterações de data com rapidez.
+          </p>
+        </button>
       </div>
     </div>
   )
