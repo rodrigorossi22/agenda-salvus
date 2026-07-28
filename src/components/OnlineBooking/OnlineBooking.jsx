@@ -1173,22 +1173,9 @@ export default function OnlineBooking() {
   }, [datesWithSlots])
 
   const handleCalendarDateSelect = (date) => {
-    const isHeadSpa = selectedProcedure?.id === 'head-spa'
     const dayOfWeek = date.getDay()
-    
-    let isValid = false
-    let message = ''
-    
-    if (isHeadSpa) {
-      isValid = (dayOfWeek === 1 || dayOfWeek === 2 || dayOfWeek === 3)
-      message = 'O Head Spa da profissional Raquel Nina está disponível apenas de segunda a quarta-feira. Por favor, escolha um desses dias.'
-    } else {
-      isValid = (dayOfWeek !== 0 && dayOfWeek !== 6)
-      message = 'A clínica não realiza atendimentos aos finais de semana (sábado e domingo). Por favor, escolha um dia útil.'
-    }
-    
-    if (!isValid) {
-      alert(message)
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      alert('A clínica não realiza atendimentos aos finais de semana (sábado e domingo). Por favor, escolha um dia útil.')
       return
     }
 
