@@ -60,6 +60,31 @@ export default function WelcomeStage({ onSelectOption }) {
             Consulte seus horários marcados, veja detalhes, cancele ou solicite alterações de data com rapidez.
           </p>
         </button>
+
+        <div className="pt-2">
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-[#e6e2dc]"></div>
+            <span className="flex-shrink mx-3 text-[10px] uppercase tracking-widest text-[#c5a059] font-semibold">Conheça Também</span>
+            <div className="flex-grow border-t border-[#e6e2dc]"></div>
+          </div>
+
+          <button
+            onClick={() => onSelectOption('EXCLUSIVE_SOLUTIONS')}
+            className="w-full mt-2 text-left bg-gradient-to-r from-white via-[#faf8f3] to-white hover:bg-[#c5a059]/10 border border-[#c5a059]/60 hover:border-[#c5a059] rounded-xl p-5 transition-all duration-300 group cursor-pointer shadow-sm flex flex-col justify-between"
+          >
+            <div className="flex justify-between items-center w-full">
+              <h3 className="font-semibold text-sm text-[#2e2a25] group-hover:text-[#c5a059] transition-colors flex items-center gap-2">
+                <span>✨</span> Tratamentos Exclusivos & Medicina
+              </h3>
+              <svg className="w-4 h-4 text-[#c5a059] transform group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+            <p className="text-xs text-[#7a7065] mt-2 leading-relaxed">
+              Emagrecimento, Otimização de Performance, Rejuvenescimento e Estética Íntima com benefício especial reservado para pacientes Wellhub.
+            </p>
+          </button>
+        </div>
       </div>
     </div>
   )

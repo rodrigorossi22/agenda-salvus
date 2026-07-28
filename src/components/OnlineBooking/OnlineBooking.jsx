@@ -14,6 +14,7 @@ import FormStage from './FormStage'
 import SuccessStage from './SuccessStage'
 import WaitlistModal from './WaitlistModal'
 import MyAppointmentsStage from './MyAppointmentsStage'
+import ExclusiveSolutionsStage from './ExclusiveSolutionsStage'
 
 const DEFAULT_PROCEDURE = {
   id: 149, // Outros (Consulta de Avaliação Estética) na Feegow
@@ -29,7 +30,8 @@ const STAGES = {
   DATETIME: 'DATETIME',
   FORM: 'FORM',
   SUCCESS: 'SUCCESS',
-  MY_APPOINTMENTS: 'MY_APPOINTMENTS'
+  MY_APPOINTMENTS: 'MY_APPOINTMENTS',
+  EXCLUSIVE_SOLUTIONS: 'EXCLUSIVE_SOLUTIONS'
 }
 
 function timeToMinutes(timeStr) {
@@ -1201,7 +1203,9 @@ export default function OnlineBooking() {
           {stage === STAGES.WELCOME && (
             <WelcomeStage
               onSelectOption={(option) => {
-                if (option === 'MY_APPOINTMENTS') {
+                if (option === 'EXCLUSIVE_SOLUTIONS') {
+                  setStage(STAGES.EXCLUSIVE_SOLUTIONS)
+                } else if (option === 'MY_APPOINTMENTS') {
                   setIsFirstTime(false)
                   setStage(STAGES.MY_APPOINTMENTS)
                 } else if (option === 'PATIENT') {
@@ -1212,6 +1216,12 @@ export default function OnlineBooking() {
                   setStage(STAGES.FLOW_SELECTION)
                 }
               }}
+            />
+          )}
+
+          {stage === STAGES.EXCLUSIVE_SOLUTIONS && (
+            <ExclusiveSolutionsStage
+              onBack={() => setStage(STAGES.WELCOME)}
             />
           )}
 
