@@ -52,7 +52,7 @@ const PROCEDURES = [
     description: 'Alívio de tensões e relaxamento profundo.',
     category: 'Reset Mental',
     feegowId: 355,
-    professionalIds: ['16'], // Exclusivo Esteticista (ID 16)
+    professionalIds: ['16', '15'], // Esteticista e Dra. Mônica
     displayDuration: '50'
   },
   {
