@@ -1199,7 +1199,7 @@ export default function OnlineBooking() {
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-[#2e2a25] flex flex-col items-center justify-start py-10 font-sans">
       <div className="mb-6 flex justify-center">
-        <img src={salvusLogo} alt="Clínica Salvus" className="h-20 md:h-24 object-contain" />
+        <img src={salvusLogo} alt="Clínica Salvus" className="h-30 md:h-36 object-contain" />
       </div>
       
       <AnimatePresence mode="wait">
