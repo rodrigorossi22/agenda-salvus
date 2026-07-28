@@ -214,7 +214,11 @@ export async function createPatient({ nome_completo, celular, cpf, email, nascim
   return data.content?.paciente_id || null
 }
 
-export async function createAppointment({ local_id, paciente_id, procedimento_id, data, horario, notas, profissional_id = 15 }) {
+export async function createAppointment({ local_id, paciente_id, procedimento_id, data, horario, notas, notes, profissional_id = 15 }) {
+  const formattedDate = data ? data.replace(/-/g, '/') : ''
+  const formattedTime = horario ? horario.substring(0, 5) : ''
+  const defaultNotes = `Agendamento realizado via link online de pacientes. ${formattedDate} e ${formattedTime}`
+
   const payload = {
     local_id: Number(local_id),
     paciente_id: Number(paciente_id),
@@ -226,7 +230,7 @@ export async function createAppointment({ local_id, paciente_id, procedimento_id
     plano: 0,
     convenio_id: 0,
     valor: 0,
-    notas: notas || 'Agendamento realizado via link online de pacientes.',
+    notas: notas || notes || defaultNotes,
   }
 
   return request('/appoints/new-appoint', {

@@ -906,7 +906,7 @@ export default function OnlineBooking() {
         procedimento_id: targetProcId,
         data: formattedDate,
         horario: bookingTime,
-        notes: `Agendamento automático via link online (${isTestMode ? 'Teste' : profNameForNotes}). Origem/UTM: ID ${getOrigemId()}.`,
+        notas: `Agendamento realizado via link online de pacientes. ${formattedDate.replace(/-/g, '/')} e ${bookingTime?.substring(0, 5)}`,
         profissional_id: targetProfId
       })
 
@@ -1019,7 +1019,7 @@ export default function OnlineBooking() {
           procedimento_id: targetProcId,
           data: formattedDate,
           horario: selectedTime,
-          notes: `Agendamento automático via link online (${isTestMode ? 'Teste' : profNameForNotes}). Origem/UTM: ID ${getOrigemId()}.`,
+          notas: `Agendamento realizado via link online de pacientes. ${formattedDate.replace(/-/g, '/')} e ${selectedTime?.substring(0, 5)}`,
           profissional_id: targetProfId
         })
 
@@ -1105,7 +1105,7 @@ export default function OnlineBooking() {
           procedimento_id: targetProcId,
           data: formattedDate,
           horario: selectedTime,
-          notes: `Agendamento automático via link online (${isTestMode ? 'Teste' : profNameForNotes}). Origem/UTM: ID ${getOrigemId()}.`,
+          notas: `Agendamento realizado via link online de pacientes. ${formattedDate.replace(/-/g, '/')} e ${selectedTime?.substring(0, 5)}`,
           profissional_id: targetProfId
         })
 
