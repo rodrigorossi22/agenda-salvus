@@ -82,6 +82,50 @@ export default function OnlineBooking() {
   const [waitlistTurno, setWaitlistTurno] = useState('qualquer')
   const [isVagaRelampago, setIsVagaRelampago] = useState(false)
 
+  const loadPatientAppointmentsHistory = useCallback(async (patientId) => {
+    if (!patientId) return
+    setLoadingCpfHistory(true)
+    setErrorMessage(null)
+    try {
+      const today = new Date()
+      const startYear = today.getFullYear()
+      const startMonth = String(today.getMonth() + 1).padStart(2, '0')
+      const dateStart = `01-${startMonth}-${startYear}`
+
+      const futureLimit = addDays(today, 60)
+      const dateEnd = format(futureLimit, 'dd-MM-yyyy')
+
+      const appts = await fetchAppointments(dateStart, dateEnd, patientId, true)
+      const activeAppts = appts.filter(
+        (a) => ![13, 16, 21].includes(a.status_id)
+      )
+      setPatientMonthlyAppointments(activeAppts)
+    } catch (err) {
+      console.error('Erro ao buscar histórico de agendamentos por celular:', err)
+    } finally {
+      setLoadingCpfHistory(false)
+    }
+  }, [])
+
+  const loadPatientActiveAppointments = useCallback(async (patientId) => {
+    if (!patientId) return
+    setLoadingActiveAppointments(true)
+    try {
+      const today = new Date()
+      const dateStart = format(today, 'dd-MM-yyyy')
+      const futureLimit = addDays(today, 90)
+      const dateEnd = format(futureLimit, 'dd-MM-yyyy')
+
+      const appts = await fetchAppointments(dateStart, dateEnd, patientId, false)
+      const activeFuture = appts.filter((a) => ![11, 12, 14, 21].includes(Number(a.status_id)))
+      setPatientActiveAppointments(activeFuture)
+    } catch (err) {
+      console.error('Erro ao buscar agendamentos ativos:', err)
+    } finally {
+      setLoadingActiveAppointments(false)
+    }
+  }, [])
+
   // Leitura dos parâmetros URL da Vaga Relâmpago (?date=DD-MM-YYYY&time=HH:mm) e Meus Agendamentos (?my_appointments=1&phone=...)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -207,52 +251,6 @@ export default function OnlineBooking() {
       setBirthDate(parts.join('/'))
     }
   }
-
-  const loadPatientAppointmentsHistory = useCallback(async (patientId) => {
-    if (!patientId) return
-    setLoadingCpfHistory(true)
-    setErrorMessage(null)
-    try {
-      const today = new Date()
-      const startYear = today.getFullYear()
-      const startMonth = String(today.getMonth() + 1).padStart(2, '0')
-      const dateStart = `01-${startMonth}-${startYear}` // Primeiro dia do mês atual
-
-      const futureLimit = addDays(today, 60)
-      const dateEnd = format(futureLimit, 'dd-MM-yyyy')
-
-      const appts = await fetchAppointments(dateStart, dateEnd, patientId, true)
-      const activeAppts = appts.filter(
-        // Antes: [11, 12, 13, 14, 16, 21]. Agora, os status 11 (Cancelado), 12 (Falta) e 14 (Desmarcado)
-        // NÃO são ignorados, ou seja, "gastam" a cota semanal/mensal do paciente.
-        (a) => ![13, 16, 21].includes(a.status_id)
-      )
-      setPatientMonthlyAppointments(activeAppts)
-    } catch (err) {
-      console.error('Erro ao buscar histórico de agendamentos por celular:', err)
-    } finally {
-      setLoadingCpfHistory(false)
-    }
-  }, [])
-
-  const loadPatientActiveAppointments = useCallback(async (patientId) => {
-    if (!patientId) return
-    setLoadingActiveAppointments(true)
-    try {
-      const today = new Date()
-      const dateStart = format(today, 'dd-MM-yyyy')
-      const futureLimit = addDays(today, 90)
-      const dateEnd = format(futureLimit, 'dd-MM-yyyy')
-
-      const appts = await fetchAppointments(dateStart, dateEnd, patientId, false)
-      const activeFuture = appts.filter((a) => ![11, 12, 14, 21].includes(Number(a.status_id)))
-      setPatientActiveAppointments(activeFuture)
-    } catch (err) {
-      console.error('Erro ao buscar agendamentos ativos:', err)
-    } finally {
-      setLoadingActiveAppointments(false)
-    }
-  }, [])
 
   const handleCancelAppointment = async (appt) => {
     if (!appt || !appt.agendamento_id) return
