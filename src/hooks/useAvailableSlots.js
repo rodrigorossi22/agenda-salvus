@@ -59,7 +59,7 @@ export function useAvailableSlots({ selectedProcedure, flowMode, isTestMode, isD
       const today = new Date();
       const todayStr = format(today, 'dd-MM-yyyy');
 
-      const standardLimit = addDays(today, BUSINESS_RULES.INITIAL_SEARCH_DAYS);
+      const standardLimit = addDays(today, BUSINESS_RULES.INITIAL_SLOT_SEARCH_DAYS);
       const endLimit = addDays(selectedDate, 10);
       const finalEnd = endLimit > standardLimit ? endLimit : standardLimit;
       const futureStr = format(finalEnd, 'dd-MM-yyyy');
