@@ -17,8 +17,9 @@ import MyAppointmentsStage from './MyAppointmentsStage'
 import ExclusiveSolutionsStage from './ExclusiveSolutionsStage'
 
 const DEFAULT_PROCEDURE = {
-  id: 149, // Outros (Consulta de Avaliação Estética) na Feegow
-  name: 'Atendimento Estético',
+  id: 338,
+  feegowId: 338,
+  name: 'Shape Detox Gympass',
   duration: 60
 }
 
@@ -497,7 +498,7 @@ export default function OnlineBooking() {
         let fetchProcId = targetProcId
         if (String(profId) === '5') {
           fetchProcId = 338
-        } else if (flowMode === 'DATE_FIRST' && !selectedProcedure) {
+        } else if (!selectedProcedure || Number(targetProcId) === 149) {
           fetchProcId = String(profId) === '16' ? 339 : 338
         }
         return fetchAvailableSchedule({
@@ -647,11 +648,12 @@ export default function OnlineBooking() {
       const times = Object.keys(dateSlots).sort()
       if (times.length > 0) {
         const validSlots = times.filter(time => {
-          const slotProfId = String(dateSlots[time])
+          let slotProfId = String(dateSlots[time])
+          let validProfIds = slotProfId.split(',')
           const slotStart = timeToMinutes(time)
           
           let durationMinutes = 60
-          if (slotProfId !== '16' && ![338, 339, 346, 347, 349, 354, 355].includes(Number(selectedProcedure?.feegowId))) {
+          if (!validProfIds.includes('16') && ![338, 339, 346, 347, 349, 354, 355].includes(Number(selectedProcedure?.feegowId))) {
             durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
           }
           const slotEnd = slotStart + durationMinutes
@@ -669,21 +671,37 @@ export default function OnlineBooking() {
             }
           }
 
-          // Terça, Quinta e Sexta para a Esteticista
+          // 1. Terça, Quinta e Sexta para a Esteticista
           const dayOfWeek = selectedDate.getDay()
-          if (slotProfId === '16' && dayOfWeek !== 2 && dayOfWeek !== 4 && dayOfWeek !== 5) {
-            return false
+          if (validProfIds.includes('16') && dayOfWeek !== 2 && dayOfWeek !== 4 && dayOfWeek !== 5) {
+            validProfIds = validProfIds.filter(id => id !== '16')
           }
 
-          // Regra Especial Enfermagem (ID 5): Liberado EXCLUSIVAMENTE em 31/07/2026 nos horários 15:30, 16:30, 17:30, 18:30 e 19:30
-          if (slotProfId.split(',').includes('5')) {
-            if (dateKey !== '2026-07-31') return false
-            const allowedEnfermagemTimes = ['15:30:00', '15:30', '16:30:00', '16:30', '17:30:00', '17:30', '18:30:00', '18:30', '19:30:00', '19:30']
-            if (!allowedEnfermagemTimes.includes(time)) return false
+          // 2. Regra Especial Enfermagem (ID 5): Liberado EXCLUSIVAMENTE em 31/07/2026 nos horários específicos
+          if (validProfIds.includes('5')) {
+            const isAllowedFor5 = dateKey === '2026-07-31' && ['15:30:00', '15:30', '16:30:00', '16:30', '17:30:00', '17:30', '18:30:00', '18:30', '19:30:00', '19:30'].includes(time)
+            if (!isAllowedFor5) {
+              validProfIds = validProfIds.filter(id => id !== '5')
+            }
           }
+
+          // 3. Bloqueio de Almoço da Monica Sousa (ID 15) entre 14:00 (840 min) e 15:00 (900 min)
+          if (validProfIds.includes('15')) {
+            const LUNCH_START = 14 * 60; // 14:00 (840 min)
+            const LUNCH_END = 15 * 60;   // 15:00 (900 min)
+            if ((slotStart < LUNCH_START && slotEnd > LUNCH_START) || (slotStart >= LUNCH_START && slotStart < LUNCH_END)) {
+              validProfIds = validProfIds.filter(id => id !== '15')
+            }
+          }
+
+          // Se todos os profissionais foram filtrados pelas regras, o horário não está mais disponível
+          if (validProfIds.length === 0) return false
+
+          // Atualiza o slot com os profissionais sobreviventes para as próximas etapas
+          dateSlots[time] = validProfIds.join(',')
 
           const collidingAppt = appointmentsForSelectedDate.find(appt => {
-            if (!slotProfId.split(',').includes(String(appt.profissional_id))) return false
+            if (!validProfIds.includes(String(appt.profissional_id))) return false
             if ([11, 12, 14].includes(Number(appt.status_id))) return false
             const apptStart = timeToMinutes(appt.horario)
             const apptDuration = Number(appt.duracao) || 60
@@ -717,7 +735,7 @@ export default function OnlineBooking() {
             
             const slotProfId = String(dateSlots[time])
             let slotDuration = 60
-            if (slotProfId !== '16' && ![338, 339, 346, 347, 349, 354, 355].includes(Number(selectedProcedure?.feegowId))) {
+            if (!slotProfId.split(',').includes('16') && ![338, 339, 346, 347, 349, 354, 355].includes(Number(selectedProcedure?.feegowId))) {
               slotDuration = procedureDurations[selectedProcedure?.feegowId] || 60
             }
             nextAvailableTime = slotStart + slotDuration
@@ -742,8 +760,16 @@ export default function OnlineBooking() {
     
     // Sort by priority (higher priority professional first)
     const prioritySorted = [...candidates].sort((a, b) => {
-      const prioA = targetProfIds.indexOf(a.profId)
-      const prioB = targetProfIds.indexOf(b.profId)
+      const aProfs = a.profId.split(',')
+      const bProfs = b.profId.split(',')
+      const prioA = Math.min(...aProfs.map(id => {
+        const idx = targetProfIds.indexOf(id)
+        return idx === -1 ? 999 : idx
+      }))
+      const prioB = Math.min(...bProfs.map(id => {
+        const idx = targetProfIds.indexOf(id)
+        return idx === -1 ? 999 : idx
+      }))
       return prioA - prioB
     })
 
@@ -770,6 +796,7 @@ export default function OnlineBooking() {
 
     uniqueCandidates.forEach(cand => {
       const { time, localId, profId } = cand
+      const profIdsArr = profId.split(',')
       slotLocals[time] = localId
       if (!foundLocalId) {
         foundLocalId = localId
@@ -780,10 +807,11 @@ export default function OnlineBooking() {
       } else if (time >= '12:00:00' && time < '18:00:00') {
         afternoon.push(time)
       } else {
-        if (profId === '15' && isRestrictedDay) {
+        if (profIdsArr.includes('15') && isRestrictedDay) {
            const monicaVisualEveningSlots = evening.filter(t => {
              const slotLocal = slotLocals[t]
-             return availableSlots[slotLocal]?.[dateKey]?.[t] === '15'
+             const slotProfString = availableSlots[slotLocal]?.[dateKey]?.[t]
+             return slotProfString && slotProfString.split(',').includes('15')
            }).length
            
            if (eveningAppointmentsCount >= 1) {
@@ -823,11 +851,12 @@ export default function OnlineBooking() {
         
         // Filter slots based on professional availability rules
         const hasValidSlot = Object.keys(slotsMap).some(time => {
-          const slotProfId = String(slotsMap[time])
+          let slotProfId = String(slotsMap[time])
+          let validProfIds = slotProfId.split(',')
           const slotStart = timeToMinutes(time)
           
           let durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
-          if (slotProfId === '16' && Number(selectedProcedure?.feegowId) === 338) {
+          if (validProfIds.includes('16') && Number(selectedProcedure?.feegowId) === 338) {
             durationMinutes = 60
           }
           const slotEnd = slotStart + durationMinutes
@@ -844,20 +873,35 @@ export default function OnlineBooking() {
             }
           }
 
-          // Terça, Quinta e Sexta para a Esteticista
           const [year, month, day] = dateKey.split('-').map(Number)
           const dateToCheck = new Date(year, month - 1, day)
           const dayOfWeek = dateToCheck.getDay()
-          if (slotProfId === '16' && dayOfWeek !== 2 && dayOfWeek !== 4 && dayOfWeek !== 5) {
-            return false
+          
+          // 1. Terça, Quinta e Sexta para a Esteticista
+          if (validProfIds.includes('16') && dayOfWeek !== 2 && dayOfWeek !== 4 && dayOfWeek !== 5) {
+            validProfIds = validProfIds.filter(id => id !== '16')
           }
 
-          // Regra Especial Enfermagem (ID 5): Liberado EXCLUSIVAMENTE em 31/07/2026 nos horários 15:30, 16:30, 17:30, 18:30 e 19:30
-          if (slotProfId.split(',').includes('5')) {
-            if (dateKey !== '2026-07-31') return false
-            const allowedEnfermagemTimes = ['15:30:00', '15:30', '16:30:00', '16:30', '17:30:00', '17:30', '18:30:00', '18:30', '19:30:00', '19:30']
-            if (!allowedEnfermagemTimes.includes(time)) return false
+          // 2. Regra Especial Enfermagem (ID 5)
+          if (validProfIds.includes('5')) {
+            const isAllowedFor5 = dateKey === '2026-07-31' && ['15:30:00', '15:30', '16:30:00', '16:30', '17:30:00', '17:30', '18:30:00', '18:30', '19:30:00', '19:30'].includes(time)
+            if (!isAllowedFor5) {
+              validProfIds = validProfIds.filter(id => id !== '5')
+            }
           }
+
+          // 3. Bloqueio de Almoço da Monica Sousa (ID 15)
+          if (validProfIds.includes('15')) {
+            const LUNCH_START = 14 * 60; // 14:00 (840 min)
+            const LUNCH_END = 15 * 60;   // 15:00 (900 min)
+            if ((slotStart < LUNCH_START && slotEnd > LUNCH_START) || (slotStart >= LUNCH_START && slotStart < LUNCH_END)) {
+              validProfIds = validProfIds.filter(id => id !== '15')
+            }
+          }
+
+          if (validProfIds.length === 0) return false
+          
+          slotsMap[time] = validProfIds.join(',')
 
           // Collision check
           const dateStr = format(dateToCheck, 'dd-MM-yyyy')
@@ -876,7 +920,7 @@ export default function OnlineBooking() {
           })
           
           const hasCollision = appointmentsForSelectedDate.some(appt => {
-            if (!slotProfId.split(',').includes(String(appt.profissional_id))) return false
+            if (!validProfIds.includes(String(appt.profissional_id))) return false
             if ([11, 12, 14].includes(Number(appt.status_id))) return false
             const apptStart = timeToMinutes(appt.horario)
             const apptDuration = Number(appt.duracao) || 60
