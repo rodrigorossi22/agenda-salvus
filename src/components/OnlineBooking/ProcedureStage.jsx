@@ -43,7 +43,7 @@ const PROCEDURES = [
     description: 'Drenagem clássica para ativação do sistema linfático, eliminação de líquidos e toxinas.',
     category: 'Desintoxicação',
     feegowId: 339,
-    professionalIds: ['16'], // Exclusivo Esteticista (ID 16)
+    professionalIds: ['16', '5'], // Esteticista (ID 16) e Enfermagem (ID 5)
     displayDuration: '50'
   },
   {
@@ -52,7 +52,7 @@ const PROCEDURES = [
     description: 'Alívio de tensões e relaxamento profundo.',
     category: 'Reset Mental',
     feegowId: 355,
-    professionalIds: ['16', '15'], // Esteticista e Dra. Mônica
+    professionalIds: ['16', '15', '5'], // Esteticista, Dra. Mônica e Enfermagem (ID 5)
     displayDuration: '50'
   },
   {
@@ -61,7 +61,7 @@ const PROCEDURES = [
     description: 'Massagem corporal relaxante para alívio de tensões e relaxamento profundo.',
     category: 'Reset Mental',
     feegowId: 349,
-    professionalIds: ['16'], // Exclusivo Esteticista (ID 16)
+    professionalIds: ['16', '5'], // Esteticista (ID 16) e Enfermagem (ID 5)
     displayDuration: '50'
   }
 ]

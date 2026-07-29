@@ -40,6 +40,65 @@ function timeToMinutes(timeStr) {
   return parts[0] * 60 + parts[1]
 }
 
+function getEquipmentOccupancy(slotStart, slotEnd, appointmentsForDate) {
+  if (!appointmentsForDate || appointmentsForDate.length === 0) return []
+
+  const overlapping = appointmentsForDate.filter(appt => {
+    if ([11, 12, 14].includes(Number(appt.status_id))) return false
+    const apptStart = timeToMinutes(appt.horario)
+    const apptDur = Number(appt.duracao) || 60
+    const apptEnd = apptStart + apptDur
+    return slotStart < apptEnd && slotEnd > apptStart
+  })
+
+  const ventosaCount = overlapping.filter(a =>
+    Number(a.procedimento_id) === 346 ||
+    String(a.procedimento_nome || '').toLowerCase().includes('ventosa')
+  ).length
+
+  const shapeDetoxCount = overlapping.filter(a =>
+    Number(a.procedimento_id) === 338 ||
+    String(a.procedimento_nome || '').toLowerCase().includes('shape detox')
+  ).length
+
+  const correnteRussaCount = overlapping.filter(a =>
+    Number(a.procedimento_id) === 354 ||
+    String(a.procedimento_nome || '').toLowerCase().includes('corrente')
+  ).length
+
+  const eletroCount = overlapping.filter(a =>
+    Number(a.procedimento_id) === 347 ||
+    String(a.procedimento_nome || '').toLowerCase().includes('eletro')
+  ).length
+
+  const heccusStrictCount = shapeDetoxCount + correnteRussaCount
+  const totalEletroDevicesCount = shapeDetoxCount + correnteRussaCount + eletroCount
+
+  const blockedProcIds = []
+
+  // 1. Ventosaterapia (346): Apenas 1 kit na clínica
+  if (ventosaCount >= 1) {
+    blockedProcIds.push(346)
+  }
+
+  // 2. Shape Detox (338): 2 Mantas Térmicas & 2 Heccus
+  if (shapeDetoxCount >= 2 || heccusStrictCount >= 2) {
+    blockedProcIds.push(338)
+  }
+
+  // 3. Corrente Russa (354): Exige Heccus (máximo 2 na clínica)
+  if (heccusStrictCount >= 2) {
+    blockedProcIds.push(354)
+  }
+
+  // 4. Eletroestimulação (347): Heccus ou Extra (3 aparelhos no total)
+  if (totalEletroDevicesCount >= 3 || (heccusStrictCount >= 2 && eletroCount >= 1)) {
+    blockedProcIds.push(347)
+  }
+
+  return blockedProcIds
+}
+
 function normalizeName(name) {
   if (!name) return ''
   const prepositions = ['de', 'do', 'dos', 'das', 'da', 'e']
@@ -398,7 +457,11 @@ export default function OnlineBooking() {
       const futureStr = format(finalEnd, 'dd-MM-yyyy')
       
       const targetProcId = isTestMode ? 338 : (selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id)
-      const targetProfIds = isTestMode ? ['1'] : (selectedProcedure?.professionalIds || ['16', '15'])
+      let baseProfIds = isTestMode ? ['1'] : (selectedProcedure?.professionalIds || ['16', '15'])
+      if (!isTestMode && !baseProfIds.includes('5')) {
+        baseProfIds = [...baseProfIds, '5']
+      }
+      const targetProfIds = baseProfIds
 
       const cacheKey = `${flowMode}_${targetProcId}_${todayStr}_${futureStr}_${isTestMode}`
       const cached = slotsCacheRef.current[cacheKey]
@@ -420,7 +483,9 @@ export default function OnlineBooking() {
 
       const schedulePromises = targetProfIds.map(profId => {
         let fetchProcId = targetProcId
-        if (flowMode === 'DATE_FIRST' && !selectedProcedure) {
+        if (String(profId) === '5') {
+          fetchProcId = 338
+        } else if (flowMode === 'DATE_FIRST' && !selectedProcedure) {
           fetchProcId = String(profId) === '16' ? 339 : 338
         }
         return fetchAvailableSchedule({
@@ -598,6 +663,13 @@ export default function OnlineBooking() {
             return false
           }
 
+          // Regra Especial Enfermagem (ID 5): Liberado EXCLUSIVAMENTE em 31/07/2026 nos horários 15:30, 16:30, 17:30, 18:30 e 19:30
+          if (slotProfId === '5') {
+            if (dateKey !== '2026-07-31') return false
+            const allowedEnfermagemTimes = ['15:30:00', '15:30', '16:30:00', '16:30', '17:30:00', '17:30', '18:30:00', '18:30', '19:30:00', '19:30']
+            if (!allowedEnfermagemTimes.includes(time)) return false
+          }
+
           const collidingAppt = appointmentsForSelectedDate.find(appt => {
             if (String(appt.profissional_id) !== slotProfId) return false
             if ([11, 12, 14].includes(Number(appt.status_id))) return false
@@ -610,6 +682,14 @@ export default function OnlineBooking() {
           })
 
           if (collidingAppt) return false
+
+          // Equipment collision check across the entire clinic for selectedProcedure
+          if (selectedProcedure?.feegowId) {
+            const blockedEquipmentIds = getEquipmentOccupancy(slotStart, slotEnd, appointmentsForSelectedDate)
+            if (blockedEquipmentIds.includes(Number(selectedProcedure.feegowId))) {
+              return false
+            }
+          }
 
           return true
         })
@@ -756,6 +836,13 @@ export default function OnlineBooking() {
             return false
           }
 
+          // Regra Especial Enfermagem (ID 5): Liberado EXCLUSIVAMENTE em 31/07/2026 nos horários 15:30, 16:30, 17:30, 18:30 e 19:30
+          if (slotProfId === '5') {
+            if (dateKey !== '2026-07-31') return false
+            const allowedEnfermagemTimes = ['15:30:00', '15:30', '16:30:00', '16:30', '17:30:00', '17:30', '18:30:00', '18:30', '19:30:00', '19:30']
+            if (!allowedEnfermagemTimes.includes(time)) return false
+          }
+
           // Collision check
           const dateStr = format(dateToCheck, 'dd-MM-yyyy')
           const appointmentsForSelectedDate = professionalAppointmentsRange.filter(appt => appt.data === dateStr)
@@ -769,7 +856,17 @@ export default function OnlineBooking() {
             return slotStart < apptEnd && slotEnd > apptStart
           })
 
-          return !hasCollision
+          if (hasCollision) return false
+
+          // Equipment collision check across the entire clinic for selectedProcedure
+          if (selectedProcedure?.feegowId) {
+            const blockedEquipmentIds = getEquipmentOccupancy(slotStart, slotEnd, appointmentsForSelectedDate)
+            if (blockedEquipmentIds.includes(Number(selectedProcedure.feegowId))) {
+              return false
+            }
+          }
+
+          return true
         })
 
         // Converte a data para verificar limites preventivamente
@@ -815,36 +912,13 @@ export default function OnlineBooking() {
 
     // Calcular equipamentos em uso na clínica inteira para o horário selecionado
     const timeMin = timeToMinutes(time)
-    const overlappingAppts = appointmentsForSelectedDate.filter(appt => {
-      if ([11, 12, 14].includes(Number(appt.status_id))) return false
-      const apptStart = timeToMinutes(appt.horario)
-      const apptDur = Number(appt.duracao) || 60
-      const apptEnd = apptStart + apptDur
-      return timeMin >= apptStart && timeMin < apptEnd
-    })
-
-    const blockedIds = []
-
-    // Regra 1: Ventosaterapia (346) - Apenas 1 kit por horário na clínica
-    const hasVentosa = overlappingAppts.some(a => 
-      Number(a.procedimento_id) === 346 || 
-      String(a.procedimento_nome || '').toLowerCase().includes('ventosa')
-    )
-    if (hasVentosa) {
-      blockedIds.push(346)
+    let selectedProcDuration = 60
+    if (selectedProcedure?.feegowId) {
+      selectedProcDuration = procedureDurations[selectedProcedure.feegowId] || 60
     }
+    const timeEnd = timeMin + selectedProcDuration
 
-    // Regra 2: Eletroestimulação (347) & Corrente Russa (354) - Aparelho compartilhado único na clínica
-    const hasEletroOrCorrente = overlappingAppts.some(a => 
-      [347, 354].includes(Number(a.procedimento_id)) || 
-      String(a.procedimento_nome || '').toLowerCase().includes('eletro') || 
-      String(a.procedimento_nome || '').toLowerCase().includes('corrente')
-    )
-    if (hasEletroOrCorrente) {
-      blockedIds.push(347)
-      blockedIds.push(354)
-    }
-
+    const blockedIds = getEquipmentOccupancy(timeMin, timeEnd, appointmentsForSelectedDate)
     setBlockedProcedureIdsForTime(blockedIds)
 
     if (flowMode === 'DATE_FIRST' && !selectedProcedure) {
