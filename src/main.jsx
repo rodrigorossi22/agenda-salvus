@@ -10,8 +10,10 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<App />} />
+        <Route path="/" element={<OnlineBooking />} />
         <Route path="/agendamento_online" element={<OnlineBooking />} />
+        <Route path="/admin" element={<App />} />
+        <Route path="/agenda" element={<App />} />
         <Route path="/menu" element={<ServiceMenu />} />
         <Route path="/servicos" element={<ServiceMenu />} />
         <Route path="/tabela" element={<ServiceMenu />} />
