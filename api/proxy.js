@@ -1,66 +1,83 @@
 /* global process */
-// Vercel serverless proxy for Feegow API
-// This proxies /api/* requests to https://api.feegow.com/v1/api/*
-// and adds the x-access-token header from the environment variable VITE_FEEGOW_TOKEN.
+const ALLOWED_ORIGINS = [
+  'https://agenda-salvus.vercel.app',
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : null
+].filter(Boolean);
+
+const ALLOWED_ENDPOINTS = [
+  { method: 'GET', pathRegex: /^patient\/search$/ },
+  { method: 'GET', pathRegex: /^patient\/list$/ },
+  { method: 'POST', pathRegex: /^patient\/create$/ },
+  { method: 'GET', pathRegex: /^appoints\/search$/ },
+  { method: 'POST', pathRegex: /^appoints\/statusUpdate$/ },
+  { method: 'POST', pathRegex: /^appoints\/new-appoint$/ },
+  { method: 'GET', pathRegex: /^appoints\/available-schedule$/ },
+  { method: 'GET', pathRegex: /^professional\/list$/ },
+  { method: 'GET', pathRegex: /^procedures\/list$/ },
+  { method: 'POST', pathRegex: /^medical-reports\/create$/ }
+];
+
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (!origin && process.env.NODE_ENV === 'development') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-app-token');
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return true;
+  }
+  return false;
+}
+
+function sanitizePath(queryPath) {
+  const rawPath = Array.isArray(queryPath) ? queryPath.join('/') : queryPath || '';
+  return rawPath.replace(/(\.\.[\/\\])+/g, '').replace(/[^\w\-\/]/g, '').replace(/^\/+|\/+$/g, '');
+}
+
+function isEndpointAllowed(method, cleanPath) {
+  return ALLOWED_ENDPOINTS.some(ep => ep.method === method.toUpperCase() && ep.pathRegex.test(cleanPath));
+}
 
 export default async function handler(req, res) {
-    // Get the path passed from the vercel.json rewrite
-    const { path: queryPath, ...otherParams } = req.query;
-    const pathStr = Array.isArray(queryPath) ? queryPath.join('/') : queryPath || '';
-
-    const feegowUrl = `https://api.feegow.com/v1/api/${pathStr}`;
-
-    // Forward query params (excluding path used by Vercel routing)
-    const url = new URL(feegowUrl);
-    for (const [key, value] of Object.entries(otherParams)) {
-        url.searchParams.set(key, value);
+  if (applyCors(req, res)) return;
+  const { path: queryPath, ...otherParams } = req.query;
+  const cleanPath = sanitizePath(queryPath);
+  if (!isEndpointAllowed(req.method, cleanPath)) {
+    return res.status(403).json({ error: 'Endpoint não permitido pelo Proxy de Segurança' });
+  }
+  const feegowUrl = `https://api.feegow.com/v1/api/${cleanPath}`;
+  const url = new URL(feegowUrl);
+  for (const [key, value] of Object.entries(otherParams)) url.searchParams.set(key, value);
+  const token = process.env.FEEGOW_TOKEN || process.env.VITE_FEEGOW_TOKEN;
+  if (!token) return res.status(500).json({ error: 'FEEGOW_TOKEN não configurado no servidor' });
+  console.log(`[Proxy] ${req.method} ${cleanPath} (Token length: ${token.length})`);
+  try {
+    const fetchOptions = {
+      method: req.method || 'GET',
+      headers: {
+        'x-access-token': token,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'AgendaSalvus-Proxy/1.0',
+      },
+    };
+    if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
+      fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     }
-
-    const token = process.env.VITE_FEEGOW_TOKEN;
-
-    if (!token) {
-        return res.status(500).json({ error: 'VITE_FEEGOW_TOKEN not configured' });
-    }
-
-    console.log('[Proxy] Requesting:', url.toString(), 'Token length:', token.length, 'Prefix:', token.substring(0, 15));
-
+    const response = await fetch(url.toString(), fetchOptions);
+    const responseText = await response.text();
     try {
-        const fetchOptions = {
-            method: req.method || 'GET',
-            headers: {
-                'x-access-token': token,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Origin': 'https://agenda-salvus.vercel.app',
-                'Referer': 'https://agenda-salvus.vercel.app/',
-            },
-        };
-
-        // Forward body for POST/PUT/PATCH
-        if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
-            fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-            console.log(`[Proxy] ${req.method} ${pathStr} — body:`, fetchOptions.body);
-        }
-
-        const response = await fetch(url.toString(), fetchOptions);
-        const responseText = await response.text();
-
-        try {
-            const data = JSON.parse(responseText);
-            res.status(response.status).json(data);
-        } catch (jsonError) {
-            console.error('Feegow proxy response is not JSON. Status:', response.status);
-            console.error('Response body preview:', responseText.substring(0, 1000));
-            res.status(502).json({
-                error: 'Failed to parse JSON response from Feegow API',
-                status: response.status,
-                preview: responseText.substring(0, 500)
-            });
-        }
-    } catch (error) {
-        console.error('Feegow proxy error:', error);
-        res.status(502).json({ error: 'Failed to proxy request to Feegow API' });
+      return res.status(response.status).json(JSON.parse(responseText));
+    } catch (jsonError) {
+      return res.status(502).json({ error: 'Resposta inválida recebida da API de agendamentos' });
     }
+  } catch (error) {
+    return res.status(502).json({ error: 'Falha ao conectar com o serviço de agendamento' });
+  }
 }
