@@ -1,0 +1,107 @@
+/**
+ * IDs dos Procedimentos na API Feegow
+ */
+export const FEEGOW_PROCEDURES = {
+  EVALUATION_ESTHETIC: 149, // Outros (Consulta de Avaliação Estética)
+  SHAPE_DETOX: 338,
+  AGENDA_ESTETICISTA: 339,
+  VENTOSATERAPIA: 346,
+  ELETROESTIMULACAO: 347,
+  MASSAGEM_MODELADORA: 349,
+  CORRENTE_RUSSA: 354,
+  DRENAGEM_LINFATICA: 355,
+}
+
+// Procedimentos estéticos corporais com duração fixa de 60 minutos
+export const ESTHETIC_BODY_PROCEDURE_IDS = [149, 338, 339, 346, 347, 349, 354, 355]
+
+/**
+ * IDs dos Profissionais na API Feegow
+ */
+export const FEEGOW_PROFESSIONALS = {
+  TEST_MODE_USER: '1',
+  NURSING: '5',
+  MONICA_SOUSA: '15',
+  ESTETICISTA: '16',
+}
+
+export const DEFAULT_PROFESSIONAL_IDS = ['16', '15']
+
+/**
+ * IDs de Status de Agendamento na Feegow
+ */
+export const FEEGOW_STATUS = {
+  CANCELLED_BY_PATIENT: 11,
+  CANCELLED_BY_CLINIC: 12,
+  NO_SHOW: 13,
+  CANCELLED_SYSTEM: 14,
+  ATTENDED: 16,
+  SCHEDULED_PENDING: 21,
+}
+
+// Status que indicam agendamento inativo/cancelado (não causam colisão de horário)
+export const INACTIVE_APPOINTMENT_STATUSES = [
+  FEEGOW_STATUS.CANCELLED_BY_PATIENT,
+  FEEGOW_STATUS.CANCELLED_BY_CLINIC,
+  FEEGOW_STATUS.CANCELLED_SYSTEM,
+]
+
+// Status excluídos ao carregar agendamentos ativos futuros
+export const EXCLUDED_ACTIVE_STATUSES = [
+  FEEGOW_STATUS.CANCELLED_BY_PATIENT,
+  FEEGOW_STATUS.CANCELLED_BY_CLINIC,
+  FEEGOW_STATUS.CANCELLED_SYSTEM,
+  FEEGOW_STATUS.SCHEDULED_PENDING,
+]
+
+// Status excluídos ao carregar histórico de consultas do paciente
+export const EXCLUDED_HISTORY_STATUSES = [
+  FEEGOW_STATUS.NO_SHOW,
+  FEEGOW_STATUS.ATTENDED,
+  FEEGOW_STATUS.SCHEDULED_PENDING,
+]
+
+/**
+ * Origens de Cadastro (Lead Sources) na Feegow
+ */
+export const FEEGOW_ORIGIN = {
+  PAID_TRAFFIC: 6,
+  DIRECT_WHATSAPP: 20,
+  INSTAGRAM_DM: 22,
+  GYMPASS: 23,
+}
+
+/**
+ * Regras de Negócio e Limites da Clínica
+ */
+export const BUSINESS_RULES = {
+  DEFAULT_PROCEDURE_DURATION_MINUTES: 60,
+  INITIAL_SLOT_SEARCH_DAYS: 35,
+  PATIENT_HISTORY_SEARCH_DAYS: 60,
+  PATIENT_ACTIVE_SEARCH_DAYS: 90,
+  SLOTS_CACHE_TTL_MS: 30000, // 30 segundos
+  MAX_PATIENT_MONTHLY_APPOINTMENTS: 2,
+  MAX_PATIENT_WEEKLY_APPOINTMENTS: 1,
+  LATE_CANCELLATION_THRESHOLD_HOURS: 24,
+  CLINIC_CLOSING_TIME_MINUTES: 1230, // 20:30h
+  CLINIC_CLOSING_TOLERANCE_MINUTES: 1,
+  SCARCITY_SLOTS_PER_PERIOD: 3,
+  CPF_REQUIRED_LENGTH: 11,
+  BIRTH_DATE_DIGITS_LENGTH: 8,
+}
+
+/**
+ * Regras Excepcionais de Agenda
+ */
+export const SPECIAL_AGENDA_RULES = {
+  TEMPORARY_BLOCK_DATE_SHAPE_DETOX: '2026-07-13',
+  TEMPORARY_BLOCK_TIME_SHAPE_DETOX: '17:30:00',
+  SPECIAL_NURSING_DATE: '2026-07-31',
+  SPECIAL_NURSING_ALLOWED_TIMES: [
+    '15:30:00', '15:30',
+    '16:30:00', '16:30',
+    '17:30:00', '17:30',
+    '18:30:00', '18:30',
+    '19:30:00', '19:30',
+  ],
+}

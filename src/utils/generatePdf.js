@@ -1,5 +1,3 @@
-import { jsPDF } from 'jspdf';
-
 /**
  * Generates a Medical Report (Laudo/Prontuário) PDF in base64 format.
  *
@@ -22,6 +20,7 @@ export async function generateEvolutionPdfBase64({
     nextSteps = '',
     evolutionText = '',
 }) {
+    const { jsPDF } = await import('jspdf');
     return new Promise((resolve, reject) => {
         try {
             const doc = new jsPDF();

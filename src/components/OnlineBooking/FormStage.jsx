@@ -8,23 +8,28 @@ export default function FormStage({
   selectedDate,
   selectedTime,
   isTestMode,
-  name,
-  setName,
-  cpf,
-  setCpf,
-  birthDate,
-  onChangeBirthDate,
+  name: initialName = '',
+  setName: setParentName,
+  cpf: initialCpf = '',
+  setCpf: setParentCpf,
+  birthDate: initialBirthDate = '',
+  onChangeBirthDate: setParentBirthDate,
   onBlurBirthDate,
-  email,
-  setEmail,
-  phone,
-  onChangePhone,
+  email: initialEmail = '',
+  setEmail: setParentEmail,
+  phone: initialPhone = '',
+  onChangePhone: setParentPhone,
   foundPatientName,
   submitting,
   errorMessage,
   onBooking,
   onBack
 }) {
+  const [name, setName] = useState(initialName)
+  const [cpf, setCpf] = useState(initialCpf)
+  const [birthDate, setBirthDate] = useState(initialBirthDate)
+  const [email, setEmail] = useState(initialEmail)
+  const [phone, setPhone] = useState(initialPhone)
   const [fieldErrors, setFieldErrors] = useState({})
 
   const handleSubmit = (e) => {
@@ -54,7 +59,14 @@ export default function FormStage({
     }
 
     setFieldErrors({})
-    onBooking(e)
+
+    // Atualiza estados do pai se fornecidos
+    if (setParentName) setParentName(name)
+    if (setParentCpf) setParentCpf(cpf)
+    if (setParentEmail) setParentEmail(email)
+    if (setParentPhone) setParentPhone(phone)
+
+    onBooking(e, { name, cpf, birthDate, email, phone })
   }
 
   return (

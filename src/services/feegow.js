@@ -54,7 +54,7 @@ export async function fetchPatient(paciente_id) {
   return data.content ?? null
 }
 
-export async function fetchAppointments(dateStart, dateEnd = dateStart, paciente_id = null, includeCancelled = false) {
+export async function fetchAppointments(dateStart, dateEnd = dateStart, paciente_id = null, includeCancelled = false, resolvePatients = true) {
   const query = { data_start: dateStart, data_end: dateEnd }
   if (paciente_id) {
     query.paciente_id = String(paciente_id)
@@ -66,6 +66,13 @@ export async function fetchAppointments(dateStart, dateEnd = dateStart, paciente
   const appointments = rawAppointments.filter(
     (a) => includeCancelled ? true : ![11, 12, 13, 14, 21].includes(a.status_id)
   )
+
+  if (!resolvePatients) {
+    return appointments.map((a) => ({
+      ...a,
+      paciente_nome: `Paciente #${a.paciente_id}`,
+    }))
+  }
 
   const uniqueIds = [...new Set(appointments.map((a) => a.paciente_id).filter(Boolean))]
   const patientMap = {}
@@ -168,7 +175,7 @@ export async function searchPatient({ cpf, telefone }) {
       phoneCandidates.push(`${ddd}${numberPart}`)
     }
 
-    for (const cand of phoneCandidates) {
+    const promises = phoneCandidates.map(async (cand) => {
       const params = new URLSearchParams()
       params.set('limit', '50')
       params.set('offset', '0')
@@ -185,6 +192,12 @@ export async function searchPatient({ cpf, telefone }) {
       } catch (err) {
         console.error(`Erro ao buscar telefone candidato ${cand}:`, err)
       }
+      return null
+    })
+
+    const results = await Promise.all(promises)
+    for (const res of results) {
+      if (res) return res
     }
   }
 
