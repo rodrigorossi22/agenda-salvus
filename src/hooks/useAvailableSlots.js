@@ -3,7 +3,7 @@ import { format, addDays } from 'date-fns';
 import { fetchAvailableSchedule, fetchAppointments, fetchProcedures } from '../services/feegow.js';
 import { getEquipmentOccupancy } from '../services/equipmentRules.js';
 import { timeToMinutes } from '../utils/dateHelpers.js';
-import { BUSINESS_RULES, DEFAULT_PROFESSIONAL_IDS, ESTHETIC_BODY_PROCEDURE_IDS, FEEGOW_PROCEDURES, FEEGOW_PROFESSIONALS } from '../constants/feegow.js';
+import { BUSINESS_RULES, DEFAULT_PROFESSIONAL_IDS, ESTHETIC_BODY_PROCEDURE_IDS, FEEGOW_PROCEDURES, FEEGOW_PROFESSIONALS, SPECIAL_AGENDA_RULES } from '../constants/feegow.js';
 
 const DEFAULT_PROCEDURE_ID = FEEGOW_PROCEDURES.EVALUATION_ESTHETIC;
 
@@ -146,6 +146,21 @@ export function useAvailableSlots({ selectedProcedure, flowMode, isTestMode, isD
         });
       });
 
+      // Injeta slots especiais de Sábado (01/08/2026) para a Mônica (15) no local 1
+      const satKey = SPECIAL_AGENDA_RULES.SPECIAL_SATURDAY_DATE;
+      const satLocalId = '1';
+      if (!mergedSlots[satLocalId]) mergedSlots[satLocalId] = {};
+      if (!mergedSlots[satLocalId][satKey]) mergedSlots[satLocalId][satKey] = {};
+      SPECIAL_AGENDA_RULES.SPECIAL_SATURDAY_ALLOWED_TIMES.forEach((t) => {
+        const timeKey = t.length === 5 ? `${t}:00` : t;
+        const curr = mergedSlots[satLocalId][satKey][timeKey];
+        if (!curr) {
+          mergedSlots[satLocalId][satKey][timeKey] = FEEGOW_PROFESSIONALS.MONICA_SOUSA;
+        } else if (!curr.split(',').includes(FEEGOW_PROFESSIONALS.MONICA_SOUSA)) {
+          mergedSlots[satLocalId][satKey][timeKey] = `${curr},${FEEGOW_PROFESSIONALS.MONICA_SOUSA}`;
+        }
+      });
+
       slotsCacheRef.current[cacheKey] = {
         filteredAppts,
         mergedSlots,
@@ -210,9 +225,14 @@ export function useAvailableSlots({ selectedProcedure, flowMode, isTestMode, isD
             return false;
           }
 
-          if (dateKey === '2026-07-31') {
-            const isAllowedNursing = ['15:30:00', '15:30', '16:30:00', '16:30', '17:30:00', '17:30', '18:30:00', '18:30', '19:30:00', '19:30'].includes(time);
+          if (dateKey === SPECIAL_AGENDA_RULES.SPECIAL_NURSING_DATE) {
+            const isAllowedNursing = SPECIAL_AGENDA_RULES.SPECIAL_NURSING_ALLOWED_TIMES.includes(time);
             if (!isAllowedNursing) return false;
+          }
+
+          if (dateKey === SPECIAL_AGENDA_RULES.SPECIAL_SATURDAY_DATE) {
+            const isAllowedSat = SPECIAL_AGENDA_RULES.SPECIAL_SATURDAY_ALLOWED_TIMES.includes(time);
+            if (!isAllowedSat) return false;
           }
 
           const slotMinutes = timeToMinutes(time);
@@ -224,7 +244,8 @@ export function useAvailableSlots({ selectedProcedure, flowMode, isTestMode, isD
             return false;
           }
 
-          const blockedProcIds = getEquipmentOccupancy(slotMinutes, slotEndMinutes, appointmentsForSelectedDate);
+          const isSoloMode = dateKey === SPECIAL_AGENDA_RULES.SPECIAL_SATURDAY_DATE;
+          const blockedProcIds = getEquipmentOccupancy(slotMinutes, slotEndMinutes, appointmentsForSelectedDate, { isSoloMode });
           if (blockedProcIds.includes(currentProcId)) {
             return false;
           }
