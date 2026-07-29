@@ -9,8 +9,11 @@ export function usePatientSearch(patientLimits) {
   const [searchingPatient, setSearchingPatient] = useState(false);
   const [searchFailed, setSearchFailed] = useState(false);
 
-  const handlePhoneChange = useCallback((val) => {
-    setPhone(val);
+  const handlePhoneChange = useCallback((valOrEvent) => {
+    const value = (valOrEvent && typeof valOrEvent === 'object' && valOrEvent.target)
+      ? valOrEvent.target.value
+      : valOrEvent;
+    setPhone(value);
     if (foundPatientId) {
       setFoundPatientId(null);
       setFoundPatientName('');

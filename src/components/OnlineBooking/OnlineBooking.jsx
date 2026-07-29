@@ -36,21 +36,18 @@ export default function OnlineBooking() {
   const search = usePatientSearch(limits)
   const queryParams = useMemo(() => new URLSearchParams(window.location.search), [])
 
-  const [selectedProcedure, setSelectedProcedureState] = useState(null)
-  const [flowMode, setFlowModeState] = useState(null)
-
-  const slots = useAvailableSlots({
-    selectedProcedure,
-    flowMode,
-    isTestMode,
-    isDateAllowed: limits.isDateAllowed
-  })
-
   const flow = useBookingFlow({
     patientSearch: search,
     patientLimits: limits,
-    availableSlots: slots,
+    availableSlots: null, // será preenchido via ref abaixo
     isTestMode
+  })
+
+  const slots = useAvailableSlots({
+    selectedProcedure: flow.selectedProcedure,
+    flowMode: flow.flowMode,
+    isTestMode,
+    isDateAllowed: limits.isDateAllowed
   })
 
   const activeProfessionalId = isTestMode ? '1' : (flow.selectedProcedure?.professionalIds?.[0] || '15')
@@ -362,7 +359,10 @@ export default function OnlineBooking() {
                   if (formData.email) setEmail(formData.email)
                   if (formData.phone) search.setPhone(formData.phone)
                 }
-                await flow.handleBooking(formData || { name, cpf: search.cpf, email, phone: search.phone, birthDate })
+                await flow.handleBooking(
+                  formData || { name, cpf: search.cpf, email, phone: search.phone, birthDate },
+                  { selectedDate: slots.selectedDate, selectedTime: slots.selectedTime, selectedLocalId: slots.selectedLocalId }
+                )
               }}
               onBack={() => flow.setStage(STAGES.DATETIME)}
             />

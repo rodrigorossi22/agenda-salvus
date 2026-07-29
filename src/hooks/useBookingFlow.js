@@ -58,8 +58,12 @@ export function useBookingFlow({ patientSearch, patientLimits, availableSlots, i
     return FEEGOW_ORIGIN.DIRECT_WHATSAPP;
   }, []);
 
-  const handleBooking = useCallback(async (formData) => {
-    if (!availableSlots.selectedDate || !availableSlots.selectedTime) {
+  const handleBooking = useCallback(async (formData, slotsData = {}) => {
+    const bookingDate = slotsData.selectedDate || availableSlots?.selectedDate;
+    const bookingTime = slotsData.selectedTime || availableSlots?.selectedTime;
+    const bookingLocalId = slotsData.selectedLocalId || availableSlots?.selectedLocalId;
+
+    if (!bookingDate || !bookingTime) {
       setErrorMessage('Por favor, selecione uma data e horário.');
       return;
     }
@@ -88,11 +92,11 @@ export function useBookingFlow({ patientSearch, patientLimits, availableSlots, i
 
       const procId = selectedProcedure?.feegowId || 149;
       const profId = isTestMode ? '1' : (selectedProcedure?.professionalIds?.[0] || '15');
-      const formattedDate = `${String(availableSlots.selectedDate.getDate()).padStart(2, '0')}-${String(availableSlots.selectedDate.getMonth() + 1).padStart(2, '0')}-${availableSlots.selectedDate.getFullYear()}`;
-      const formattedTime = `${availableSlots.selectedTime}:00`;
+      const formattedDate = `${String(bookingDate.getDate()).padStart(2, '0')}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}-${bookingDate.getFullYear()}`;
+      const formattedTime = `${bookingTime}:00`;
 
       const apptRes = await createAppointment({
-        local_id: availableSlots.selectedLocalId || 1,
+        local_id: bookingLocalId || 1,
         paciente_id: patientId,
         procedimento_id: procId,
         profissional_id: profId,
@@ -105,7 +109,7 @@ export function useBookingFlow({ patientSearch, patientLimits, availableSlots, i
         patientName: formData.name || patientSearch?.foundPatientName,
         procedureName: selectedProcedure?.name || 'Atendimento Estético',
         date: formattedDate,
-        time: availableSlots.selectedTime,
+        time: bookingTime,
         phone: formData.phone || patientSearch?.phone,
       };
 
