@@ -311,7 +311,13 @@ export default function OnlineBooking() {
               errorMessage={slots.errorMessage || flow.errorMessage}
               loadSlots={slots.loadSlots}
               scarcitySlotsForDate={slots.scarcitySlotsForDate}
-              datesWithSlots={slots.datesWithSlots}
+              datesWithSlots={Array.from(slots.datesWithSlots || []).map(dStr => {
+                if (typeof dStr === 'string' && dStr.includes('-')) {
+                  const [y, m, d] = dStr.split('-').map(Number);
+                  return new Date(y, m - 1, d);
+                }
+                return new Date(dStr);
+              }).filter(d => !isNaN(d.getTime()))}
               weekdaysWithSelected={weekdaysWithSelected}
               onSelectDate={(date) => {
                 slots.setSelectedDate(date)
