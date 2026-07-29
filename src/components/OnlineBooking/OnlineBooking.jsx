@@ -241,8 +241,20 @@ export default function OnlineBooking() {
   const [professionalAppointmentsRange, setProfessionalAppointmentsRange] = useState([])
   const appointmentsForSelectedDate = useMemo(() => {
     if (!selectedDate || !professionalAppointmentsRange) return []
-    const dateStr = format(selectedDate, 'dd-MM-yyyy')
-    return professionalAppointmentsRange.filter(a => a.data === dateStr)
+    const targetDateStr = format(selectedDate, 'dd-MM-yyyy')
+    return professionalAppointmentsRange.filter(a => {
+      if (!a?.data) return false
+      const cleanData = String(a.data).replace(/\//g, '-')
+      if (cleanData === targetDateStr) return true
+      if (cleanData.includes('-')) {
+        const parts = cleanData.split('-')
+        if (parts[0].length === 4) {
+          const formatted = `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`
+          return formatted === targetDateStr
+        }
+      }
+      return cleanData === targetDateStr
+    })
   }, [selectedDate, professionalAppointmentsRange])
   const [loadingAppointments, setLoadingAppointments] = useState(false)
 
@@ -664,14 +676,14 @@ export default function OnlineBooking() {
           }
 
           // Regra Especial Enfermagem (ID 5): Liberado EXCLUSIVAMENTE em 31/07/2026 nos horários 15:30, 16:30, 17:30, 18:30 e 19:30
-          if (slotProfId === '5') {
+          if (slotProfId.split(',').includes('5')) {
             if (dateKey !== '2026-07-31') return false
             const allowedEnfermagemTimes = ['15:30:00', '15:30', '16:30:00', '16:30', '17:30:00', '17:30', '18:30:00', '18:30', '19:30:00', '19:30']
             if (!allowedEnfermagemTimes.includes(time)) return false
           }
 
           const collidingAppt = appointmentsForSelectedDate.find(appt => {
-            if (String(appt.profissional_id) !== slotProfId) return false
+            if (!slotProfId.split(',').includes(String(appt.profissional_id))) return false
             if ([11, 12, 14].includes(Number(appt.status_id))) return false
             const apptStart = timeToMinutes(appt.horario)
             const apptDuration = Number(appt.duracao) || 60
@@ -722,7 +734,11 @@ export default function OnlineBooking() {
       }
     }
 
-    const targetProfIds = isTestMode ? ['1'] : (selectedProcedure?.professionalIds || ['15'])
+    let baseProfIdsScarcity = isTestMode ? ['1'] : (selectedProcedure?.professionalIds || ['16', '15'])
+    if (!isTestMode && !baseProfIdsScarcity.includes('5')) {
+      baseProfIdsScarcity = [...baseProfIdsScarcity, '5']
+    }
+    const targetProfIds = baseProfIdsScarcity
     
     // Sort by priority (higher priority professional first)
     const prioritySorted = [...candidates].sort((a, b) => {
@@ -837,7 +853,7 @@ export default function OnlineBooking() {
           }
 
           // Regra Especial Enfermagem (ID 5): Liberado EXCLUSIVAMENTE em 31/07/2026 nos horários 15:30, 16:30, 17:30, 18:30 e 19:30
-          if (slotProfId === '5') {
+          if (slotProfId.split(',').includes('5')) {
             if (dateKey !== '2026-07-31') return false
             const allowedEnfermagemTimes = ['15:30:00', '15:30', '16:30:00', '16:30', '17:30:00', '17:30', '18:30:00', '18:30', '19:30:00', '19:30']
             if (!allowedEnfermagemTimes.includes(time)) return false
@@ -845,10 +861,22 @@ export default function OnlineBooking() {
 
           // Collision check
           const dateStr = format(dateToCheck, 'dd-MM-yyyy')
-          const appointmentsForSelectedDate = professionalAppointmentsRange.filter(appt => appt.data === dateStr)
+          const appointmentsForSelectedDate = professionalAppointmentsRange.filter(a => {
+            if (!a?.data) return false
+            const cleanData = String(a.data).replace(/\//g, '-')
+            if (cleanData === dateStr) return true
+            if (cleanData.includes('-')) {
+              const parts = cleanData.split('-')
+              if (parts[0].length === 4) {
+                const formatted = `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`
+                return formatted === dateStr
+              }
+            }
+            return cleanData === dateStr
+          })
           
           const hasCollision = appointmentsForSelectedDate.some(appt => {
-            if (String(appt.profissional_id) !== slotProfId) return false
+            if (!slotProfId.split(',').includes(String(appt.profissional_id))) return false
             if ([11, 12, 14].includes(Number(appt.status_id))) return false
             const apptStart = timeToMinutes(appt.horario)
             const apptDuration = Number(appt.duracao) || 60
