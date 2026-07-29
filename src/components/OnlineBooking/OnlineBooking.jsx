@@ -36,18 +36,21 @@ export default function OnlineBooking() {
   const search = usePatientSearch(limits)
   const queryParams = useMemo(() => new URLSearchParams(window.location.search), [])
 
+  const [selectedProcedure, setSelectedProcedureState] = useState(null)
+  const [flowMode, setFlowModeState] = useState(null)
+
+  const slots = useAvailableSlots({
+    selectedProcedure,
+    flowMode,
+    isTestMode,
+    isDateAllowed: limits.isDateAllowed
+  })
+
   const flow = useBookingFlow({
     patientSearch: search,
     patientLimits: limits,
-    availableSlots: {},
+    availableSlots: slots,
     isTestMode
-  })
-
-  const slots = useAvailableSlots({
-    selectedProcedure: flow.selectedProcedure,
-    flowMode: flow.flowMode,
-    isTestMode,
-    isDateAllowed: limits.isDateAllowed
   })
 
   const activeProfessionalId = isTestMode ? '1' : (flow.selectedProcedure?.professionalIds?.[0] || '15')
@@ -157,11 +160,20 @@ export default function OnlineBooking() {
     if (!slots.datesWithSlots || slots.datesWithSlots.size === 0) {
       return (slots.selectedDate && !isNaN(slots.selectedDate.getTime())) ? [slots.selectedDate] : []
     }
-    const datesArr = Array.from(slots.datesWithSlots).map(dStr => new Date(dStr))
+    const datesArr = Array.from(slots.datesWithSlots).map((dStr) => {
+      if (typeof dStr === 'string' && dStr.includes('-')) {
+        const parts = dStr.split('-').map(Number);
+        if (parts.length === 3 && parts[0] > 1900) {
+          return new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+      }
+      return new Date(dStr);
+    }).filter(d => d && !isNaN(d.getTime()));
+
     const isSelectedInList = datesArr.some(
-      day => !isNaN(day.getTime()) && format(day, 'yyyy-MM-dd') === format(slots.selectedDate, 'yyyy-MM-dd')
+      day => format(day, 'yyyy-MM-dd') === format(slots.selectedDate, 'yyyy-MM-dd')
     )
-    if (!isSelectedInList && slots.selectedDate) {
+    if (!isSelectedInList && slots.selectedDate && !isNaN(slots.selectedDate.getTime())) {
       const combined = [...datesArr, slots.selectedDate]
       return combined.sort((a, b) => a.getTime() - b.getTime())
     }
