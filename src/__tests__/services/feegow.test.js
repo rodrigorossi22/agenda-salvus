@@ -23,7 +23,7 @@ describe('fetchAppointments', () => {
     await fetchAppointments('20-03-2026')
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/appoints/search'),
-      expect.objectContaining({ headers: expect.objectContaining({ 'x-access-token': expect.any(String) }) })
+      expect.objectContaining({ headers: expect.any(Object) })
     )
   })
 

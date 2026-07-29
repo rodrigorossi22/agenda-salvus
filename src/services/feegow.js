@@ -175,7 +175,7 @@ export async function searchPatient({ cpf, telefone }) {
       phoneCandidates.push(`${ddd}${numberPart}`)
     }
 
-    const promises = phoneCandidates.map(async (cand) => {
+    for (const cand of phoneCandidates) {
       const params = new URLSearchParams()
       params.set('limit', '50')
       params.set('offset', '0')
@@ -192,12 +192,6 @@ export async function searchPatient({ cpf, telefone }) {
       } catch (err) {
         console.error(`Erro ao buscar telefone candidato ${cand}:`, err)
       }
-      return null
-    })
-
-    const results = await Promise.all(promises)
-    for (const res of results) {
-      if (res) return res
     }
   }
 
