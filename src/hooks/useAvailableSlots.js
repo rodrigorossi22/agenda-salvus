@@ -244,7 +244,7 @@ export function useAvailableSlots({ selectedProcedure, flowMode, isTestMode, isD
             return false;
           }
 
-          const isSoloMode = dateKey === SPECIAL_AGENDA_RULES.SPECIAL_SATURDAY_DATE;
+          const isSoloMode = selectedDate.getDay() === 6;
           const blockedProcIds = getEquipmentOccupancy(slotMinutes, slotEndMinutes, appointmentsForSelectedDate, { isSoloMode });
           if (blockedProcIds.includes(currentProcId)) {
             return false;
