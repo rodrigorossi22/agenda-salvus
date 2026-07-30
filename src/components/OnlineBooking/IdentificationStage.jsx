@@ -55,22 +55,25 @@ export default function IdentificationStage({
         </div>
 
         {searchFailedByPhone && (
-          <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3 text-left">
-            <p className="text-xs text-amber-200">
-              ⚠️ Não localizamos um cadastro com este número de celular. Por favor, digite seu <strong>CPF</strong> para encontrar seu cadastro:
+          <div className="mt-4 p-4 rounded-lg bg-[#faf0e6] border border-[#e6d0ba] text-left space-y-3 shadow-xs">
+            <p className="text-xs text-[#8c6d53] leading-relaxed">
+              ⚠️ Não localizamos um cadastro com este número de celular. Por favor, digite seu <strong className="text-[#2e2a25]">CPF</strong> para encontrar seu cadastro:
             </p>
-            <input
-              type="text"
-              placeholder="000.000.000-00"
-              value={cpf}
-              onChange={(e) => setCpf(e.target.value)}
-              className="w-full px-4 py-2.5 bg-[#1a1a1a] border border-[#333] focus:border-[#c5a059] text-white rounded-xl text-sm outline-none font-mono"
-            />
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-widest text-[#7a7065] mb-1">CPF *</label>
+              <input
+                type="text"
+                placeholder="000.000.000-00"
+                value={cpf}
+                onChange={(e) => setCpf(e.target.value)}
+                className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm text-sm"
+              />
+            </div>
             <button
               type="button"
               onClick={() => onSearchPatient(true)}
               disabled={searchingPatient}
-              className="w-full py-2.5 bg-[#c5a059] hover:bg-[#b08e4f] text-black font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+              className="w-full bg-[#c5a059] hover:bg-[#b08e4f] text-white font-bold py-3.5 rounded-lg uppercase tracking-wider text-[10px] transition-colors shadow-sm cursor-pointer"
             >
               {searchingPatient ? 'Buscando por CPF...' : 'Buscar por CPF'}
             </button>

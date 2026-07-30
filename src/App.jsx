@@ -116,6 +116,15 @@ function App() {
             <div className="rounded-full bg-[#c5a059]/10 px-4 py-1 text-sm font-bold text-[#c5a059]">
               {visibleAppointments.length} agendamento{visibleAppointments.length !== 1 ? 's' : ''}
             </div>
+            <button
+              onClick={() => {
+                localStorage.removeItem('salvus_admin_auth')
+                window.location.reload()
+              }}
+              className="rounded-full border border-red-500/40 bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-400 hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
+            >
+              🔒 Trancar Agenda
+            </button>
           </div>
         </header>
 

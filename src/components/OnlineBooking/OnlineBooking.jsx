@@ -839,7 +839,7 @@ export default function OnlineBooking() {
     }).length
 
     const dayOfWeek = selectedDate.getDay()
-    const isRestrictedDay = (dayOfWeek === 2 || dayOfWeek === 4 || dayOfWeek === 5)
+    const isRestrictedDay = (dayOfWeek === 2 || dayOfWeek === 4)
 
     uniqueCandidates.forEach(cand => {
       const { time, localId, profId } = cand
