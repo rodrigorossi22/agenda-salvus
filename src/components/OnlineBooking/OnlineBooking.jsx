@@ -1355,8 +1355,16 @@ export default function OnlineBooking() {
 
   const handleCalendarDateSelect = (date) => {
     const dayOfWeek = date.getDay()
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      alert('A clínica não realiza atendimentos aos finais de semana (sábado e domingo). Por favor, escolha um dia útil.')
+    
+    // Regra especial: Sábados de agosto de 2026 liberados até o dia 22
+    const isSpecialSaturday = 
+      dayOfWeek === 6 && 
+      date.getFullYear() === 2026 && 
+      date.getMonth() === 7 && // 7 é Agosto em JavaScript (0-indexed)
+      date.getDate() <= 22
+
+    if (dayOfWeek === 0 || (dayOfWeek === 6 && !isSpecialSaturday)) {
+      alert('A clínica não realiza atendimentos neste fim de semana. Por favor, escolha um dia útil.')
       return
     }
 
