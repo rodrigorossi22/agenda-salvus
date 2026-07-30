@@ -402,10 +402,11 @@ export default function OnlineBooking() {
     }
   }, [queryParams])
 
-  // Reset maxFetchedDate e hasAutoSelectedRef quando modo de teste ou procedimento mudarem
+  // Reset maxFetchedDate, hasAutoSelectedRef e availableSlots quando modo de teste ou procedimento mudarem
   useEffect(() => {
     setMaxFetchedDate(null)
     hasAutoSelectedRef.current = false
+    setAvailableSlots({}) // Limpa os slots antigos para evitar auto-seleção baseada em estado obsoleto
   }, [isTestMode, selectedProcedure])
 
   // Load procedure durations from Feegow on mount
@@ -463,11 +464,11 @@ export default function OnlineBooking() {
       const today = new Date()
       const todayStr = format(today, 'dd-MM-yyyy')
       
-      // Janela inicial de 35 dias (cobre 5 semanas para navegabilidade instantânea em 0ms)
-      const standardLimit = addDays(today, 35)
-      const endLimit = addDays(selectedDate, 10)
-      const finalEnd = endLimit > standardLimit ? endLimit : standardLimit
-      const futureStr = format(finalEnd, 'dd-MM-yyyy')
+      // Janela inicial expandida para 60 dias (2 meses) para captura imediata da próxima vaga em procedimentos concorridos
+      const standardLimit = addDays(today, 60)
+      const endLimit = addDays(selectedDate, 15)
+      let finalEnd = endLimit > standardLimit ? endLimit : standardLimit
+      let futureStr = format(finalEnd, 'dd-MM-yyyy')
       
       const targetProcId = isTestMode ? 338 : (selectedProcedure?.feegowId || DEFAULT_PROCEDURE.id)
       let baseProfIds = isTestMode ? ['1'] : (selectedProcedure?.professionalIds || ['16', '15'])
@@ -488,32 +489,58 @@ export default function OnlineBooking() {
         return
       }
 
-      // EXECUTAR TUDO EM PARALELO SIMULTÂNEO (SEM WATERFALL)
-      const apptsPromise = fetchAppointments(todayStr, futureStr, null, false).catch(err => {
-        console.error('Erro ao carregar agendamentos:', err)
-        return []
-      })
+      // Função auxiliar para consulta paralela à Feegow
+      const fetchScheduleForEnd = async (searchEndStr) => {
+        const apptsPromise = fetchAppointments(todayStr, searchEndStr, null, false).catch(err => {
+          console.error('Erro ao carregar agendamentos:', err)
+          return []
+        })
 
-      const schedulePromises = targetProfIds.map(profId => {
-        let fetchProcId = targetProcId
-        if (String(profId) === '5') {
-          fetchProcId = 338
-        } else if (!selectedProcedure || Number(targetProcId) === 149) {
-          fetchProcId = String(profId) === '16' ? 339 : 338
-        }
-        return fetchAvailableSchedule({
-          procedimento_id: fetchProcId,
-          data_start: todayStr,
-          data_end: futureStr,
-          profissional_id: profId
-        }).catch(err => {
-          console.error(`Erro ao carregar agenda do profissional ${profId}:`, err)
-          return null
+        const schedulePromises = targetProfIds.map(profId => {
+          let fetchProcId = targetProcId
+          if (String(profId) === '5') {
+            fetchProcId = 338
+          } else if (!selectedProcedure || Number(targetProcId) === 149) {
+            fetchProcId = String(profId) === '16' ? 339 : 338
+          }
+          return fetchAvailableSchedule({
+            procedimento_id: fetchProcId,
+            data_start: todayStr,
+            data_end: searchEndStr,
+            profissional_id: profId
+          }).catch(err => {
+            console.error(`Erro ao carregar agenda do profissional ${profId}:`, err)
+            return null
+          })
+        })
+
+        return await Promise.all([apptsPromise, ...schedulePromises])
+      }
+
+      // EXECUTAR TUDO EM PARALELO SIMULTÂNEO (SEM WATERFALL)
+      let [allAppts, ...scheduleResults] = await fetchScheduleForEnd(futureStr)
+
+      // Checa se encontrou alguma data com vaga no intervalo de 60 dias
+      const hasAnySlotsInResults = scheduleResults.some(data => {
+        if (!data || !data.profissional_id) return false
+        return Object.keys(data.profissional_id).some(pId => {
+          const localMap = data.profissional_id[pId]?.local_id || {}
+          return Object.keys(localMap).some(locId => {
+            const dateMap = localMap[locId] || {}
+            return Object.keys(dateMap).some(dKey => (dateMap[dKey] || []).length > 0)
+          })
         })
       })
 
-      // Aguarda todos os resultados simultaneamente
-      const [allAppts, ...scheduleResults] = await Promise.all([apptsPromise, ...schedulePromises])
+      // Se não encontrou NENHUMA vaga nos primeiros 60 dias, estende a busca automaticamente para 90 dias (3 meses)
+      if (!hasAnySlotsInResults && !isTestMode) {
+        const extendedEnd = addDays(today, 90)
+        finalEnd = extendedEnd
+        futureStr = format(extendedEnd, 'dd-MM-yyyy')
+        const extendedResults = await fetchScheduleForEnd(futureStr)
+        allAppts = extendedResults[0]
+        scheduleResults = extendedResults.slice(1)
+      }
 
       const filteredAppts = (allAppts || []).filter(a => targetProfIds.includes(String(a.profissional_id)))
       setProfessionalAppointmentsRange(filteredAppts)
@@ -1289,22 +1316,28 @@ export default function OnlineBooking() {
     }
   }
 
-  // Combined list of dates with slots plus the selected date if it's outside the list
+  // Combined list of top 5 dates with slots plus the selected date if it's outside the list
   const weekdaysWithSelected = useMemo(() => {
     if (!datesWithSlots || datesWithSlots.length === 0) {
       return (selectedDate && !isNaN(selectedDate.getTime())) ? [selectedDate] : []
     }
 
-    if (!selectedDate || isNaN(selectedDate.getTime())) return datesWithSlots
+    // Pega as 5 primeiras datas reais que possuem vagas disponíveis
+    const top5Slots = datesWithSlots.slice(0, 5)
 
-    const isSelectedInList = datesWithSlots.some(
+    if (!selectedDate || isNaN(selectedDate.getTime())) return top5Slots
+
+    const isSelectedInTop5 = top5Slots.some(
       day => !isNaN(day.getTime()) && format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
     )
-    if (!isSelectedInList && selectedDate) {
-      const combined = [...datesWithSlots, selectedDate]
+    
+    // Se o usuário selecionou uma data via "Outro Dia" que não está entre os 5 primeiros, inclui a data escolhida na régua
+    if (!isSelectedInTop5 && selectedDate) {
+      const combined = [...top5Slots, selectedDate]
       return combined.sort((a, b) => a.getTime() - b.getTime())
     }
-    return datesWithSlots
+
+    return top5Slots
   }, [datesWithSlots, selectedDate])
 
   // Auto-select first date that actually has slots ONLY on initial load if current date has no slots
