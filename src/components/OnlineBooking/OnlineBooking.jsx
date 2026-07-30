@@ -140,6 +140,7 @@ export default function OnlineBooking() {
   const [foundPatientId, setFoundPatientId] = useState(null)
   const [searchingPatient, setSearchingPatient] = useState(false)
   const [searchFailed, setSearchFailed] = useState(false)
+  const [searchFailedByPhone, setSearchFailedByPhone] = useState(false)
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false)
   const [waitlistTurno, setWaitlistTurno] = useState('qualquer')
   const [isVagaRelampago, setIsVagaRelampago] = useState(false)
@@ -283,6 +284,7 @@ export default function OnlineBooking() {
     setFoundPatientId(null)
     setFoundPatientName('')
     setSearchFailed(false)
+    setSearchFailedByPhone(false)
   }
 
   const handleBirthDateChange = (e) => {
@@ -365,24 +367,42 @@ export default function OnlineBooking() {
     }
   }
 
-  const handleSearchPatient = async () => {
-    if (!phone.trim()) {
+  const handleSearchPatient = async (forceCpfSearch = false) => {
+    const targetPhone = phone.trim()
+    const targetCpf = cpf.replace(/\D/g, '')
+
+    if (!forceCpfSearch && !targetPhone) {
       setErrorMessage('Por favor, preencha o campo de celular.')
       return
     }
+
+    if (forceCpfSearch && targetCpf.length !== 11) {
+      setErrorMessage('Por favor, digite um CPF válido com 11 dígitos.')
+      return
+    }
+
     setSearchingPatient(true)
     setErrorMessage(null)
     setSearchFailed(false)
+
     try {
-      const result = await searchPatient({ telefone: phone })
+      const result = await searchPatient({
+        telefone: targetPhone,
+        cpf: forceCpfSearch ? targetCpf : ''
+      })
+
       if (result && result.patient_id) {
         setFoundPatientId(result.patient_id)
         setFoundPatientName(result.nome)
-        // Carrega o histórico de consultas e agendamentos ativos
+        setSearchFailedByPhone(false)
         await loadPatientAppointmentsHistory(result.patient_id)
         await loadPatientActiveAppointments(result.patient_id)
       } else {
-        setSearchFailed(true)
+        if (!forceCpfSearch) {
+          setSearchFailedByPhone(true)
+        } else {
+          setSearchFailed(true)
+        }
       }
     } catch (err) {
       console.error(err)
@@ -1437,8 +1457,11 @@ export default function OnlineBooking() {
             <IdentificationStage
               phone={phone}
               onChangePhone={handlePhoneChange}
+              cpf={cpf}
+              setCpf={setCpf}
               searchingPatient={searchingPatient}
               searchFailed={searchFailed}
+              searchFailedByPhone={searchFailedByPhone}
               foundPatientId={foundPatientId}
               foundPatientName={foundPatientName}
               errorMessage={errorMessage}
@@ -1568,6 +1591,7 @@ export default function OnlineBooking() {
                 setFoundPatientId(null)
                 setFoundPatientName('')
                 setSearchFailed(false)
+                setSearchFailedByPhone(false)
                 setStage(STAGES.WELCOME)
               }}
             />
