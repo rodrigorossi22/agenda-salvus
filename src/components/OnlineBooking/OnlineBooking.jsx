@@ -125,7 +125,7 @@ const sendWhatsappConfirmation = (data) => {
   }).catch((err) => console.error('Erro ao disparar notificação de confirmação WhatsApp:', err))
 }
 
-export default function OnlineBooking() {
+export default function OnlineBooking({ isHomologation = false }) {
   const [stage, setStage] = useState(STAGES.WELCOME)
   const [flowMode, setFlowMode] = useState(null) // 'DATE_FIRST' | 'PROCEDURE_FIRST'
   const [allowedProfIdsForTime, setAllowedProfIdsForTime] = useState(null)
@@ -682,6 +682,8 @@ export default function OnlineBooking() {
     const dateKey = format(selectedDate, 'yyyy-MM-dd')
     const dateStr = format(selectedDate, 'dd-MM-yyyy')
 
+    const isSaturday30MinHomologation = isHomologation && dateKey === '2026-08-01'
+
     // Se ultrapassou o limite (semanal ou mensal), não exibe nenhum slot
     const dateAllowed = isDateAllowed(selectedDate)
     if (!dateAllowed) {
@@ -699,8 +701,8 @@ export default function OnlineBooking() {
           let validProfIds = slotProfId.split(',')
           const slotStart = timeToMinutes(time)
           
-          let durationMinutes = 60
-          if (!validProfIds.includes('16') && ![338, 339, 346, 347, 349, 354, 355].includes(Number(selectedProcedure?.feegowId))) {
+          let durationMinutes = isSaturday30MinHomologation ? 30 : 60
+          if (!isSaturday30MinHomologation && !validProfIds.includes('16') && ![338, 339, 346, 347, 349, 354, 355].includes(Number(selectedProcedure?.feegowId))) {
             durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
           }
           const slotEnd = slotStart + durationMinutes
@@ -747,18 +749,20 @@ export default function OnlineBooking() {
           // Atualiza o slot com os profissionais sobreviventes para as próximas etapas
           dateSlots[time] = validProfIds.join(',')
 
-          const collidingAppt = appointmentsForSelectedDate.find(appt => {
-            if (!validProfIds.includes(String(appt.profissional_id))) return false
-            if ([11, 12, 14].includes(Number(appt.status_id))) return false
-            const apptStart = timeToMinutes(appt.horario)
-            const apptDuration = Number(appt.duracao) || 60
-            const apptEnd = apptStart + apptDuration
+          if (!isSaturday30MinHomologation) {
+            const collidingAppt = appointmentsForSelectedDate.find(appt => {
+              if (!validProfIds.includes(String(appt.profissional_id))) return false
+              if ([11, 12, 14].includes(Number(appt.status_id))) return false
+              const apptStart = timeToMinutes(appt.horario)
+              const apptDuration = Number(appt.duracao) || 60
+              const apptEnd = apptStart + apptDuration
 
-            // Overlap check
-            return slotStart < apptEnd && slotEnd > apptStart
-          })
+              // Overlap check
+              return slotStart < apptEnd && slotEnd > apptStart
+            })
 
-          if (collidingAppt) return false
+            if (collidingAppt) return false
+          }
 
           // Equipment collision check across the entire clinic for selectedProcedure
           if (selectedProcedure?.feegowId) {
@@ -781,8 +785,8 @@ export default function OnlineBooking() {
             snappedSlots.push(time)
             
             const slotProfId = String(dateSlots[time])
-            let slotDuration = 60
-            if (!slotProfId.split(',').includes('16') && ![338, 339, 346, 347, 349, 354, 355].includes(Number(selectedProcedure?.feegowId))) {
+            let slotDuration = isSaturday30MinHomologation ? 30 : 60
+            if (!isSaturday30MinHomologation && !slotProfId.split(',').includes('16') && ![338, 339, 346, 347, 349, 354, 355].includes(Number(selectedProcedure?.feegowId))) {
               slotDuration = procedureDurations[selectedProcedure?.feegowId] || 60
             }
             nextAvailableTime = slotStart + slotDuration
@@ -873,9 +877,9 @@ export default function OnlineBooking() {
     })
 
     // Pega os 3 primeiros horários encadeados de forma sequencial (Snapping)
-    const limitedMorning = morning.slice(0, 3)
-    const limitedAfternoon = afternoon.slice(0, 3)
-    const limitedEvening = evening.slice(0, 3)
+    const limitedMorning = isSaturday30MinHomologation ? morning : morning.slice(0, 3)
+    const limitedAfternoon = isSaturday30MinHomologation ? afternoon : afternoon.slice(0, 3)
+    const limitedEvening = isSaturday30MinHomologation ? evening : evening.slice(0, 3)
 
     return {
       morning: limitedMorning,
@@ -884,7 +888,7 @@ export default function OnlineBooking() {
       localId: foundLocalId,
       slotLocals
     }
-  }, [selectedDate, availableSlots, selectedProcedure, appointmentsForSelectedDate, procedureDurations, isDateAllowed, isTestMode])
+  }, [selectedDate, availableSlots, selectedProcedure, appointmentsForSelectedDate, procedureDurations, isDateAllowed, isTestMode, isHomologation])
 
   // Extract dates that actually have slots available for selected procedure
   const datesWithSlots = useMemo(() => {
@@ -902,8 +906,9 @@ export default function OnlineBooking() {
           let validProfIds = slotProfId.split(',')
           const slotStart = timeToMinutes(time)
           
-          let durationMinutes = procedureDurations[selectedProcedure?.feegowId] || 60
-          if (validProfIds.includes('16') && Number(selectedProcedure?.feegowId) === 338) {
+          const isSaturday30MinHomologation = isHomologation && dateKey === '2026-08-01'
+          let durationMinutes = isSaturday30MinHomologation ? 30 : (procedureDurations[selectedProcedure?.feegowId] || 60)
+          if (!isSaturday30MinHomologation && validProfIds.includes('16') && Number(selectedProcedure?.feegowId) === 338) {
             durationMinutes = 60
           }
           const slotEnd = slotStart + durationMinutes
@@ -966,7 +971,7 @@ export default function OnlineBooking() {
             return cleanData === dateStr
           })
           
-          const hasCollision = appointmentsForSelectedDate.some(appt => {
+          const hasCollision = isSaturday30MinHomologation ? false : appointmentsForSelectedDate.some(appt => {
             if (!validProfIds.includes(String(appt.profissional_id))) return false
             if ([11, 12, 14].includes(Number(appt.status_id))) return false
             const apptStart = timeToMinutes(appt.horario)
@@ -1007,7 +1012,7 @@ export default function OnlineBooking() {
         return new Date(year, month - 1, day)
       })
       .sort((a, b) => a.getTime() - b.getTime())
-  }, [availableSlots, selectedProcedure, isDateAllowed, procedureDurations, professionalAppointmentsRange])
+  }, [availableSlots, selectedProcedure, isDateAllowed, procedureDurations, professionalAppointmentsRange, isHomologation])
 
   const handleProcedureSelect = (proc) => {
     setSelectedProcedure(proc)
@@ -1093,6 +1098,8 @@ export default function OnlineBooking() {
 
       const profNameForNotes = targetProfId === 15 ? 'Monica Sousa' : (targetProfId === 16 ? 'Esteticista' : 'Freelancer')
 
+      const duracaoParam = (isHomologation && formattedDate === '01-08-2026') ? 30 : undefined
+
       await createAppointment({
         local_id: bookingLocalId,
         paciente_id: foundPatientId,
@@ -1100,7 +1107,8 @@ export default function OnlineBooking() {
         data: formattedDate,
         horario: bookingTime,
         notas: `Agendamento realizado via link online de pacientes. ${formattedDate.replace(/-/g, '/')} e ${bookingTime?.substring(0, 5)}`,
-        profissional_id: targetProfId
+        profissional_id: targetProfId,
+        ...(duracaoParam ? { duracao: duracaoParam } : {})
       })
 
       sendWhatsappConfirmation({
@@ -1205,6 +1213,8 @@ export default function OnlineBooking() {
 
         const profNameForNotes = targetProfId === 15 ? 'Monica Sousa' : (targetProfId === 16 ? 'Esteticista' : 'Freelancer')
 
+        const duracaoParam = (isHomologation && formattedDate === '01-08-2026') ? 30 : undefined
+
         // Criar Agendamento
         await createAppointment({
           local_id: selectedLocalId || scarcitySlotsForDate.localId,
@@ -1213,7 +1223,8 @@ export default function OnlineBooking() {
           data: formattedDate,
           horario: selectedTime,
           notas: `Agendamento realizado via link online de pacientes. ${formattedDate.replace(/-/g, '/')} e ${selectedTime?.substring(0, 5)}`,
-          profissional_id: targetProfId
+          profissional_id: targetProfId,
+          ...(duracaoParam ? { duracao: duracaoParam } : {})
         })
 
         // Disparar notificação automática via WhatsApp no n8n (assíncrono)
@@ -1292,6 +1303,8 @@ export default function OnlineBooking() {
 
         const profNameForNotes = targetProfId === 15 ? 'Monica Sousa' : (targetProfId === 16 ? 'Esteticista' : 'Freelancer')
 
+        const duracaoParam = (isHomologation && formattedDate === '01-08-2026') ? 30 : undefined
+
         await createAppointment({
           local_id: selectedLocalId || scarcitySlotsForDate.localId,
           paciente_id: foundPatientId,
@@ -1299,7 +1312,8 @@ export default function OnlineBooking() {
           data: formattedDate,
           horario: selectedTime,
           notas: `Agendamento realizado via link online de pacientes. ${formattedDate.replace(/-/g, '/')} e ${selectedTime?.substring(0, 5)}`,
-          profissional_id: targetProfId
+          profissional_id: targetProfId,
+          ...(duracaoParam ? { duracao: duracaoParam } : {})
         })
 
         // Disparar notificação automática via WhatsApp no n8n (assíncrono)
