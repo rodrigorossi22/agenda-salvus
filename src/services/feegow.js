@@ -129,61 +129,39 @@ export async function createMedicalReport({ agendamento_id, laudo_base64 }) {
 }
 
 export async function searchPatient({ cpf, telefone }) {
-  const cleanCpf = cpf ? cpf.replace(/\D/g, '') : ''
+  let cleanCpf = cpf ? cpf.replace(/\D/g, '') : ''
   let cleanTelefone = telefone ? telefone.replace(/\D/g, '') : ''
 
-  // Normaliza telefone caso inicie com +55 (12 ou 13 dígitos numéricos)
   if (cleanTelefone.startsWith('55') && (cleanTelefone.length === 12 || cleanTelefone.length === 13)) {
     cleanTelefone = cleanTelefone.substring(2)
   }
 
-  if (cleanCpf.length > 0) {
+  // 1. Primary Search by Phone
+  if (cleanTelefone.length >= 10) {
     const params = new URLSearchParams()
-    params.set('limit', '50')
-    params.set('offset', '0')
+    params.set('telefone', cleanTelefone)
+    const data = await request(`/patient/list?${params}`)
+    const list = data.content || []
+    if (list.length > 0 && list[0].patient_id) {
+      return {
+        patient_id: list[0].patient_id,
+        nome: list[0].nome || '',
+        searchType: 'phone'
+      }
+    }
+  }
+
+  // 2. Fallback Search by CPF (if Phone failed or wasn't provided)
+  if (cleanCpf.length === 11) {
+    const params = new URLSearchParams()
     params.set('cpf', cleanCpf)
     const data = await request(`/patient/list?${params}`)
     const list = data.content || []
     if (list.length > 0 && list[0].patient_id) {
       return {
         patient_id: list[0].patient_id,
-        nome: list[0].nome || ''
-      }
-    }
-    return null
-  }
-
-  if (cleanTelefone.length > 0) {
-    const phoneCandidates = [cleanTelefone]
-
-    if (cleanTelefone.length === 10) {
-      // Ex: 7192097748 (DDD + 8 dígitos) -> Adiciona o 9: 71992097748
-      const ddd = cleanTelefone.substring(0, 2)
-      const numberPart = cleanTelefone.substring(2)
-      phoneCandidates.push(`${ddd}9${numberPart}`)
-    } else if (cleanTelefone.length === 11 && cleanTelefone.charAt(2) === '9') {
-      // Ex: 71992097748 (DDD + 9 + 8 dígitos) -> Remove o 9 excedente: 7192097748
-      const ddd = cleanTelefone.substring(0, 2)
-      const numberPart = cleanTelefone.substring(3)
-      phoneCandidates.push(`${ddd}${numberPart}`)
-    }
-
-    for (const cand of phoneCandidates) {
-      const params = new URLSearchParams()
-      params.set('limit', '50')
-      params.set('offset', '0')
-      params.set('telefone', cand)
-      try {
-        const data = await request(`/patient/list?${params}`)
-        const list = data.content || []
-        if (list.length > 0 && list[0].patient_id) {
-          return {
-            patient_id: list[0].patient_id,
-            nome: list[0].nome || ''
-          }
-        }
-      } catch (err) {
-        console.error(`Erro ao buscar telefone candidato ${cand}:`, err)
+        nome: list[0].nome || '',
+        searchType: 'cpf'
       }
     }
   }
