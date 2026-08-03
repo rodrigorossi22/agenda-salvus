@@ -15,6 +15,7 @@ import SuccessStage from './SuccessStage'
 import WaitlistModal from './WaitlistModal'
 import MyAppointmentsStage from './MyAppointmentsStage'
 import ExclusiveSolutionsStage from './ExclusiveSolutionsStage'
+import GympassPlanStage from './GympassPlanStage'
 
 const DEFAULT_PROCEDURE = {
   id: 338,
@@ -25,6 +26,7 @@ const DEFAULT_PROCEDURE = {
 
 const STAGES = {
   WELCOME: 'WELCOME',
+  PLAN_CHECK: 'PLAN_CHECK',
   IDENTIFICATION: 'IDENTIFICATION',
   FLOW_SELECTION: 'FLOW_SELECTION',
   PROCEDURE: 'PROCEDURE',
@@ -127,6 +129,7 @@ const sendWhatsappConfirmation = (data) => {
 
 export default function OnlineBooking({ isHomologation = false }) {
   const [stage, setStage] = useState(STAGES.WELCOME)
+  const [nextStageAfterPlanCheck, setNextStageAfterPlanCheck] = useState(null)
   const [flowMode, setFlowMode] = useState(null) // 'DATE_FIRST' | 'PROCEDURE_FIRST'
   const [allowedProfIdsForTime, setAllowedProfIdsForTime] = useState(null)
   const [blockedProcedureIdsForTime, setBlockedProcedureIdsForTime] = useState(null)
@@ -395,6 +398,12 @@ export default function OnlineBooking({ isHomologation = false }) {
         setFoundPatientId(result.patient_id)
         setFoundPatientName(result.nome)
         setSearchFailedByPhone(false)
+        
+        sessionStorage.setItem('salvus_patient_id', String(result.patient_id))
+        sessionStorage.setItem('salvus_patient_name', result.nome || '')
+        sessionStorage.setItem('salvus_patient_phone', targetPhone)
+        if (targetCpf) sessionStorage.setItem('salvus_patient_cpf', targetCpf)
+
         await loadPatientAppointmentsHistory(result.patient_id)
         await loadPatientActiveAppointments(result.patient_id)
       } else {
@@ -410,6 +419,19 @@ export default function OnlineBooking({ isHomologation = false }) {
     } finally {
       setSearchingPatient(false)
     }
+  }
+
+  const handleResetPatient = () => {
+    sessionStorage.removeItem('salvus_patient_id')
+    sessionStorage.removeItem('salvus_patient_name')
+    sessionStorage.removeItem('salvus_patient_phone')
+    sessionStorage.removeItem('salvus_patient_cpf')
+    setFoundPatientId(null)
+    setFoundPatientName('')
+    setPhone('')
+    setCpf('')
+    setSearchFailed(false)
+    setSearchFailedByPhone(false)
   }
 
   // Parse tracking parameters (UTMs)
@@ -1085,13 +1107,19 @@ export default function OnlineBooking({ isHomologation = false }) {
       const rawProfStr = String(availableSlots[bookingLocalId]?.[dateKeyForBook]?.[bookingTime] || '')
       const profIdsAtTime = rawProfStr.split(',')
 
+      const dayOfWeekForBook = selectedDate.getDay()
+      let allowedProfsForDay = bookingProc?.professionalIds ? [...bookingProc.professionalIds] : ['15']
+      if (dayOfWeekForBook !== 2 && dayOfWeekForBook !== 4 && dayOfWeekForBook !== 5) {
+        allowedProfsForDay = allowedProfsForDay.filter(id => String(id) !== '16')
+      }
+
       let targetProfId = 15
-      if (bookingProc?.professionalIds) {
-        const matched = bookingProc.professionalIds.find(p => profIdsAtTime.includes(String(p)))
+      if (allowedProfsForDay.length > 0) {
+        const matched = allowedProfsForDay.find(p => profIdsAtTime.includes(String(p)))
         if (matched) {
           targetProfId = Number(matched)
         } else {
-          targetProfId = Number(bookingProc.professionalIds[0])
+          targetProfId = Number(allowedProfsForDay[0])
         }
       }
       if (isTestMode) targetProfId = 1
@@ -1207,9 +1235,24 @@ export default function OnlineBooking({ isHomologation = false }) {
         const targetProcId = isTestMode ? 338 : selectedProcedure?.feegowId
         
         const dateKeyForBook = format(selectedDate, 'yyyy-MM-dd')
-        const targetProfId = isTestMode 
-          ? 1 
-          : Number(availableSlots[selectedLocalId || scarcitySlotsForDate.localId]?.[dateKeyForBook]?.[selectedTime] || selectedProcedure?.professionalIds?.[0])
+        const dayOfWeekForBook = selectedDate.getDay()
+        let allowedProfsForDay = selectedProcedure?.professionalIds ? [...selectedProcedure.professionalIds] : ['15']
+        if (dayOfWeekForBook !== 2 && dayOfWeekForBook !== 4 && dayOfWeekForBook !== 5) {
+          allowedProfsForDay = allowedProfsForDay.filter(id => String(id) !== '16')
+        }
+
+        const rawSlotProf = availableSlots[selectedLocalId || scarcitySlotsForDate.localId]?.[dateKeyForBook]?.[selectedTime]
+        let targetProfId = 15
+        if (isTestMode) {
+          targetProfId = 1
+        } else if (rawSlotProf) {
+          const profsAtTime = String(rawSlotProf).split(',')
+          const matched = allowedProfsForDay.find(p => profsAtTime.includes(String(p)))
+          if (matched) targetProfId = Number(matched)
+          else if (allowedProfsForDay.length > 0) targetProfId = Number(allowedProfsForDay[0])
+        } else if (allowedProfsForDay.length > 0) {
+          targetProfId = Number(allowedProfsForDay[0])
+        }
 
         const profNameForNotes = targetProfId === 15 ? 'Monica Sousa' : (targetProfId === 16 ? 'Esteticista' : 'Freelancer')
 
@@ -1431,12 +1474,23 @@ export default function OnlineBooking({ isHomologation = false }) {
                   setStage(STAGES.MY_APPOINTMENTS)
                 } else if (option === 'PATIENT') {
                   setIsFirstTime(false)
-                  setStage(STAGES.IDENTIFICATION)
+                  setNextStageAfterPlanCheck(STAGES.IDENTIFICATION)
+                  setStage(STAGES.PLAN_CHECK)
                 } else {
                   setIsFirstTime(true)
-                  setStage(STAGES.FLOW_SELECTION)
+                  setNextStageAfterPlanCheck(STAGES.FLOW_SELECTION)
+                  setStage(STAGES.PLAN_CHECK)
                 }
               }}
+            />
+          )}
+
+          {stage === STAGES.PLAN_CHECK && (
+            <GympassPlanStage
+              onConfirmDiamond={() => {
+                setStage(nextStageAfterPlanCheck || STAGES.FLOW_SELECTION)
+              }}
+              onBack={() => setStage(STAGES.WELCOME)}
             />
           )}
 

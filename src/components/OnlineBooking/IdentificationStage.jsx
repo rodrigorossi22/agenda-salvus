@@ -15,6 +15,17 @@ export default function IdentificationStage({
   onBack,
   onProceed
 }) {
+  const handleFormSubmit = (e) => {
+    e.preventDefault()
+    if (foundPatientId) {
+      onProceed(false)
+    } else if (searchFailedByPhone) {
+      onSearchPatient(true)
+    } else {
+      onSearchPatient(false)
+    }
+  }
+
   return (
     <div className="w-full max-w-md px-4 py-8">
       <button 
@@ -41,7 +52,7 @@ export default function IdentificationStage({
         </div>
       )}
 
-      <div className="space-y-6">
+      <form onSubmit={handleFormSubmit} className="space-y-6">
         <div>
           <label className="block text-xs font-semibold uppercase tracking-widest text-[#7a7065] mb-2">WhatsApp / Celular *</label>
           <input 
@@ -50,6 +61,12 @@ export default function IdentificationStage({
             onChange={onChangePhone}
             placeholder="(DD) 99999-9999"
             disabled={searchingPatient || !!foundPatientId}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                onSearchPatient(false)
+              }
+            }}
             className="w-full bg-white border border-[#e6e2dc] disabled:bg-[#f7f6f3] disabled:text-[#a29382] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm"
           />
         </div>
@@ -66,6 +83,12 @@ export default function IdentificationStage({
                 placeholder="000.000.000-00"
                 value={cpf}
                 onChange={(e) => setCpf(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    onSearchPatient(true)
+                  }
+                }}
                 className="w-full bg-white border border-[#e6e2dc] rounded-lg px-4 py-3 text-[#2e2a25] placeholder-[#a29382] focus:outline-none focus:border-[#c5a059] transition-colors shadow-sm text-sm"
               />
             </div>
@@ -111,17 +134,24 @@ export default function IdentificationStage({
               Olá, <strong className="text-[#2e2a25]">{foundPatientName}</strong>! Encontramos seu cadastro no sistema.
             </div>
             <button 
-              type="button"
+              type="submit"
               onClick={() => onProceed(false)} // Proceed as patient
               className="w-full bg-[#c5a059] hover:bg-[#b08e4f] text-white font-bold py-4 rounded-lg uppercase tracking-widest text-xs transition-colors flex items-center justify-center shadow-md cursor-pointer"
             >
               Escolher Procedimento
             </button>
+            <button 
+              type="button"
+              onClick={() => window.location.reload()}
+              className="w-full text-[#7a7065] underline text-[10px] hover:text-[#2e2a25]"
+            >
+              Trocar Paciente
+            </button>
           </div>
         ) : (
           !searchingPatient && !searchFailed && !searchFailedByPhone && (
             <button 
-              type="button"
+              type="submit"
               onClick={() => onSearchPatient(false)}
               className="w-full bg-[#c5a059] hover:bg-[#b08e4f] text-white font-bold py-4 rounded-lg uppercase tracking-widest text-xs transition-colors flex items-center justify-center shadow-md cursor-pointer"
             >
@@ -136,7 +166,7 @@ export default function IdentificationStage({
             Buscando cadastro...
           </div>
         )}
-      </div>
+      </form>
     </div>
   )
 }
